@@ -22,7 +22,7 @@ class Compiler
 
     def type!
       return @type if @type
-
+      
       if @dependencies.size == 1
         @dependencies.first.type!
       else
