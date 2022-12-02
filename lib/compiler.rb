@@ -1,5 +1,6 @@
 require 'bundler/setup'
 require 'natalie_parser'
+require_relative './compiler/instruction'
 
 class Compiler
   def initialize(code)
@@ -19,20 +20,20 @@ class Compiler
     case node.sexp_type
     when :lit
       _, value = node
-      @instructions << [:push_int, value]
+      @instructions << Instruction.new(:push_int, arg: value, type: :int)
     when :str
       _, value = node
-      @instructions << [:push_str, value]
+      @instructions << Instruction.new(:push_str, arg: value, type: :str)
     when :block
       _, *nodes = node
       nodes.each { |n| transform(n) }
     when :lasgn
       _, name, value = node
       transform(value)
-      @instructions << [:set_var, name]
+      @instructions << Instruction.new(:set_var, arg: name)
     when :lvar
       _, name = node
-      @instructions << [:push_var, name]
+      @instructions << Instruction.new(:push_var, arg: name)
     else
       raise "unknown node: #{node.inspect}"
     end
