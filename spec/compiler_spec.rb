@@ -29,18 +29,17 @@ describe Compiler do
   end
 
   it 'can set a variable more than once' do
-    expect(compile('a = 1; a = 2; a')).must_equal [
+    expect(compile('a = 1; a = 2')).must_equal [
       { type: :int, instruction: [:push_int, 1] },
       { type: :int, instruction: [:set_var, :a] },
       { type: :int, instruction: [:push_int, 2] },
-      { type: :int, instruction: [:set_var, :a] },
-      { type: :int, instruction: [:push_var, :a] }
+      { type: :int, instruction: [:set_var, :a] }
     ]
   end
 
   it 'raises an error if the variable type changes' do
     e = expect do
-      compile('a = 1; a = "foo"; a')
+      compile('a = 1; a = "foo"')
     end.must_raise TypeError
     expect(e.message).must_equal 'Variable a was set with more than one type: [:int, :str]'
   end

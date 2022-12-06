@@ -29,5 +29,9 @@ class Compiler
         raise TypeError, 'some helpful message here'
       end
     end
+
+    def inspect
+      "<Instruction #{@name}>"
+    end
   end
 end

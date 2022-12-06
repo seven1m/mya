@@ -64,5 +64,16 @@ class Compiler
   def set_var(name, instruction)
     vars[name] ||= []
     vars[name] << instruction
+    unique_types = vars[name].map do |dep|
+      begin
+        dep.type!
+      rescue TypeError
+        # If we don't yet know the type for this dependency,
+        # that's fine, because we might know it later.
+      end
+    end.compact.uniq
+    if unique_types.size > 1
+      raise TypeError, "Variable a was set with more than one type: #{unique_types.inspect}"
+    end
   end
 end
