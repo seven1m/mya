@@ -43,4 +43,27 @@ describe Compiler do
     end.must_raise TypeError
     expect(e.message).must_equal 'Variable a was set with more than one type: [:int, :str]'
   end
+
+  it 'compiles method definitions' do
+    code = <<~CODE
+      def foo
+        'foo'
+      end
+      def bar
+        1
+      end
+      foo
+      bar
+    CODE
+    expect(compile(code)).must_equal [
+      { type: :str, instruction: [:def, :foo] },
+      { type: :str, instruction: [:push_str, 'foo'] },
+      { type: nil, instruction: [:end_def, :foo] },
+      { type: :int, instruction: [:def, :bar] },
+      { type: :int, instruction: [:push_int, 1] },
+      { type: nil, instruction: [:end_def, :bar] },
+      { type: :str, instruction: [:call, :foo, 0] },
+      { type: :int, instruction: [:call, :bar, 0] }
+    ]
+  end
 end

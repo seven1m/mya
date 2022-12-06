@@ -12,6 +12,7 @@ class Compiler
 
   def compile
     @scope_stack = [{ vars: {} }]
+    @methods = {}
     @instructions = []
     transform(@ast)
     @instructions
@@ -48,6 +49,22 @@ class Compiler
       instruction.add_dependency(VariableDependency.new(name: name, scope: scope))
       @instructions << instruction
       instruction
+    when :defn
+      _, name, args, *body = node
+      instruction = Instruction.new(:def, arg: name)
+      @instructions << instruction
+      body_instructions = body.map { |n| transform(n) }
+      return_instruction = body_instructions.last
+      instruction.add_dependency(return_instruction)
+      set_method(name, instruction)
+      @instructions << Instruction.new(:end_def, arg: name)
+      instruction
+    when :call
+      _, _receiver, name = node
+      instruction = Instruction.new(:call, arg: name, extra_arg: 0)
+      instruction.add_dependency(@methods.fetch(name))
+      @instructions << instruction
+      instruction
     else
       raise "unknown node: #{node.inspect}"
     end
@@ -75,5 +92,13 @@ class Compiler
     if unique_types.size > 1
       raise TypeError, "Variable a was set with more than one type: #{unique_types.inspect}"
     end
+  end
+
+  def set_method(name, instruction)
+    if @methods[name]
+      raise TypeError, 'TODO'
+    end
+
+    @methods[name] = instruction
   end
 end
