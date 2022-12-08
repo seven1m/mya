@@ -11,8 +11,7 @@ class Compiler
       dependencies = @scope.dig(:vars, @name)
 
       unless dependencies
-        return nil
-        #raise TypeError, "Unknown variable: #{@name}"
+        raise TypeError, "Unknown variable: #{@name}"
       end
 
       types = dependencies.map(&:type!)

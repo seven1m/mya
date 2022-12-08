@@ -33,8 +33,7 @@ class Compiler
       if @dependencies.size == 1
         @dependencies.first.type!
       else
-        return nil
-        #raise TypeError, 'some helpful message here'
+        raise TypeError, 'some helpful message here'
       end
     end
 

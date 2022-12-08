@@ -2,6 +2,7 @@ require 'bundler/setup'
 require 'natalie_parser'
 require_relative './compiler/instruction'
 require_relative './compiler/dependency'
+require_relative './compiler/call_arg_dependency'
 require_relative './compiler/variable_dependency'
 
 class Compiler
@@ -13,6 +14,7 @@ class Compiler
   def compile
     @scope_stack = [{ vars: {} }]
     @methods = {}
+    @calls = Hash.new { |h, k| h[k] = [] }
     @instructions = []
     transform(@ast)
     @instructions
@@ -50,24 +52,39 @@ class Compiler
       @instructions << instruction
       instruction
     when :defn
+      @scope_stack << { vars: {} }
       _, name, (_, *args), *body = node
       instruction = Instruction.new(:def, arg: name)
       @instructions << instruction
       args.each_with_index do |arg, index|
-        @instructions << Instruction.new(:push_arg, arg: index)
-        @instructions << Instruction.new(:set_var, arg: arg)
+        i1 = Instruction.new(:push_arg, arg: index)
+        i1.add_dependency(
+          CallArgDependency.new(
+            method_name: name,
+            calls: @calls[name],
+            arg_index: index,
+            arg_name: arg
+          )
+        )
+        @instructions << i1
+        i2 = Instruction.new(:set_var, arg: arg)
+        i2.add_dependency(i1)
+        @instructions << i2
+        set_var(arg, i2)
       end
       body_instructions = body.map { |n| transform(n) }
       return_instruction = body_instructions.last
       instruction.add_dependency(return_instruction)
       set_method(name, instruction)
+      @scope_stack.pop
       @instructions << Instruction.new(:end_def, arg: name)
       instruction
     when :call
       _, _receiver, name, *args = node
-      args.each do |arg|
+      arg_instructions = args.map do |arg|
         transform(arg)
       end
+      @calls[name] << { args: arg_instructions }
       instruction = Instruction.new(:call, arg: name, extra_arg: args.size)
       instruction.add_dependency(@methods.fetch(name))
       @instructions << instruction
