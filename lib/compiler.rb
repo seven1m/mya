@@ -50,9 +50,13 @@ class Compiler
       @instructions << instruction
       instruction
     when :defn
-      _, name, args, *body = node
+      _, name, (_, *args), *body = node
       instruction = Instruction.new(:def, arg: name)
       @instructions << instruction
+      args.each_with_index do |arg, index|
+        @instructions << Instruction.new(:push_arg, arg: index)
+        @instructions << Instruction.new(:set_var, arg: arg)
+      end
       body_instructions = body.map { |n| transform(n) }
       return_instruction = body_instructions.last
       instruction.add_dependency(return_instruction)
@@ -60,8 +64,11 @@ class Compiler
       @instructions << Instruction.new(:end_def, arg: name)
       instruction
     when :call
-      _, _receiver, name = node
-      instruction = Instruction.new(:call, arg: name, extra_arg: 0)
+      _, _receiver, name, *args = node
+      args.each do |arg|
+        transform(arg)
+      end
+      instruction = Instruction.new(:call, arg: name, extra_arg: args.size)
       instruction.add_dependency(@methods.fetch(name))
       @instructions << instruction
       instruction

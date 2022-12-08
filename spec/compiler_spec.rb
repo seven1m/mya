@@ -2,6 +2,7 @@ require 'minitest/autorun'
 require 'minitest/focus'
 
 require_relative '../lib/compiler'
+require_relative '../spec/support/expectations'
 
 describe Compiler do
   def compile(code)
@@ -64,6 +65,44 @@ describe Compiler do
       { type: nil, instruction: [:end_def, :bar] },
       { type: :str, instruction: [:call, :foo, 0] },
       { type: :int, instruction: [:call, :bar, 0] }
+    ]
+  end
+
+  it 'compiles method definitions with arguments' do
+    code = <<~CODE
+      def foo(a, b)
+        a
+      end
+
+      def bar(a)
+        a
+      end
+
+      foo('foo', 1)
+
+      bar(2)
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: nil, instruction: [:def, :foo] },
+      { type: nil, instruction: [:push_arg, 0] },
+      { type: nil, instruction: [:set_var, :a] },
+      { type: nil, instruction: [:push_arg, 1] },
+      { type: nil, instruction: [:set_var, :b] },
+      { type: nil, instruction: [:push_var, :a] },
+      { type: nil, instruction: [:end_def, :foo] },
+
+      { type: nil, instruction: [:def, :bar] },
+      { type: nil, instruction: [:push_arg, 0] },
+      { type: nil, instruction: [:set_var, :a] },
+      { type: nil, instruction: [:push_var, :a] },
+      { type: nil, instruction: [:end_def, :bar] },
+
+      { type: :str, instruction: [:push_str, 'foo'] },
+      { type: :int, instruction: [:push_int, 1] },
+      { type: nil, instruction: [:call, :foo, 2] },
+
+      { type: :int, instruction: [:push_int, 2] },
+      { type: nil, instruction: [:call, :bar, 1] }
     ]
   end
 end

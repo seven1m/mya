@@ -8,7 +8,12 @@ class Compiler
     attr_reader :name
 
     def type!
-      dependencies = @scope.fetch(:vars).fetch(@name)
+      dependencies = @scope.dig(:vars, @name)
+
+      unless dependencies
+        return nil
+        #raise TypeError, "Unknown variable: #{@name}"
+      end
 
       types = dependencies.map(&:type!)
       if types.uniq.size == 1
