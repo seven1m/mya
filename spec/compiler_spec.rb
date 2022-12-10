@@ -1,8 +1,4 @@
-require 'minitest/autorun'
-require 'minitest/focus'
-
-require_relative '../lib/compiler'
-require_relative '../spec/support/expectations'
+require_relative './spec_helper'
 
 describe Compiler do
   def compile(code)
