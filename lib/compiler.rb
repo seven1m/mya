@@ -3,6 +3,7 @@ require 'natalie_parser'
 require_relative './compiler/instruction'
 require_relative './compiler/dependency'
 require_relative './compiler/call_arg_dependency'
+require_relative './compiler/method_dependency'
 require_relative './compiler/variable_dependency'
 
 class Compiler
@@ -32,6 +33,14 @@ class Compiler
     when :str
       _, value = node
       instruction = Instruction.new(:push_str, arg: value, type: :str)
+      @instructions << instruction
+      instruction
+    when :true
+      instruction = Instruction.new(:push_true, type: :bool)
+      @instructions << instruction
+      instruction
+    when :false
+      instruction = Instruction.new(:push_false, type: :bool)
       @instructions << instruction
       instruction
     when :block
@@ -86,8 +95,20 @@ class Compiler
       end
       @calls[name] << { args: arg_instructions }
       instruction = Instruction.new(:call, arg: name, extra_arg: args.size)
-      instruction.add_dependency(@methods.fetch(name))
+      instruction.add_dependency(MethodDependency.new(name: name, methods: @methods))
       @instructions << instruction
+      instruction
+    when :if
+      _, condition, true_body, false_body = node
+      transform(condition)
+      instruction = Instruction.new(:if)
+      @instructions << instruction
+      true_instruction = transform(true_body)
+      @instructions << Instruction.new(:else)
+      false_instruction = transform(false_body)
+      @instructions << Instruction.new(:end_if)
+      instruction.add_dependency(true_instruction)
+      instruction.add_dependency(false_instruction)
       instruction
     else
       raise "unknown node: #{node.inspect}"

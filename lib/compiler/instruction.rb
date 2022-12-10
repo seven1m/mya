@@ -22,18 +22,24 @@ class Compiler
     end
 
     INSTRUCTIONS_WITH_NO_TYPE = %i[
+      else
       end_def
+      end_if
     ].freeze
 
     def type!
       return @type if @type
 
       return if INSTRUCTIONS_WITH_NO_TYPE.include?(@name)
-      
-      if @dependencies.size == 1
-        @dependencies.first.type!
+
+      unique_types = @dependencies.map(&:type!).compact.uniq
+
+      if unique_types.size == 0
+        raise TypeError, "Not enough information to infer type of instruction '#{@name}'"
+      elsif unique_types.size == 1
+        unique_types.first
       else
-        raise TypeError, 'some helpful message here'
+        raise TypeError, "Instruction '#{@name}' could have more than one type: #{unique_types.sort.inspect}"
       end
     end
 

@@ -17,6 +17,11 @@ describe Compiler do
     ]
   end
 
+  it 'compiles booleans' do
+    expect(compile('true')).must_equal [{ type: :bool, instruction: [:push_true] }]
+    expect(compile('false')).must_equal [{ type: :bool, instruction: [:push_false] }]
+  end
+
   it 'compiles variables set and get' do
     expect(compile('a = 1; a')).must_equal [
       { type: :int, instruction: [:push_int, 1] },
@@ -66,11 +71,11 @@ describe Compiler do
 
   it 'compiles method definitions with arguments' do
     code = <<~CODE
-      def foo(a, b)
+      def bar(a)
         a
       end
 
-      def bar(a)
+      def foo(a, b)
         a
       end
 
@@ -79,6 +84,12 @@ describe Compiler do
       bar(2)
     CODE
     expect(compile(code)).must_equal_with_diff [
+      { type: :int, instruction: [:def, :bar] },
+      { type: :int, instruction: [:push_arg, 0] },
+      { type: :int, instruction: [:set_var, :a] },
+      { type: :int, instruction: [:push_var, :a] },
+      { type: nil, instruction: [:end_def, :bar] },
+
       { type: :str, instruction: [:def, :foo] },
       { type: :str, instruction: [:push_arg, 0] },
       { type: :str, instruction: [:set_var, :a] },
@@ -86,12 +97,6 @@ describe Compiler do
       { type: :int, instruction: [:set_var, :b] },
       { type: :str, instruction: [:push_var, :a] },
       { type: nil, instruction: [:end_def, :foo] },
-
-      { type: :int, instruction: [:def, :bar] },
-      { type: :int, instruction: [:push_arg, 0] },
-      { type: :int, instruction: [:set_var, :a] },
-      { type: :int, instruction: [:push_var, :a] },
-      { type: nil, instruction: [:end_def, :bar] },
 
       { type: :str, instruction: [:push_str, 'foo'] },
       { type: :int, instruction: [:push_int, 1] },
@@ -125,5 +130,35 @@ describe Compiler do
     CODE
     e = expect { compile(code) }.must_raise TypeError
     expect(e.message).must_equal "Argument 'a' in method 'foo' was called with more than one type: [:int, :str]"
+  end
+
+  it 'compiles if expressions' do
+    code = <<~CODE
+      if 1
+        2
+      else
+        3
+      end
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: :int, instruction: [:push_int, 1] },
+      { type: :int, instruction: [:if] },
+      { type: :int, instruction: [:push_int, 2] },
+      { type: nil, instruction: [:else] },
+      { type: :int, instruction: [:push_int, 3] },
+      { type: nil, instruction: [:end_if] }
+    ]
+  end
+
+  it 'raises an error if both branches of an if expression do not have the same type' do
+    code = <<~CODE
+      if 1
+        2
+      else
+        'foo'
+      end
+    CODE
+    e = expect { compile(code) }.must_raise TypeError
+    expect(e.message).must_equal "Instruction 'if' could have more than one type: [:int, :str]"
   end
 end
