@@ -1,11 +1,12 @@
 class VM
-  def initialize(instructions)
+  def initialize(instructions, io: $stdou)
     @instructions = instructions
     @stack = []
     @scope_stack = [{ vars: {} }]
     @call_stack = []
     @if_depth = 0
     @methods = {}
+    @io = io
   end
 
   attr_reader :instructions
@@ -21,6 +22,15 @@ class VM
   end
 
   private
+
+  BUILT_IN_METHODS = {
+    '+': nil,
+    '-': nil,
+    '*': nil,
+    '/': nil,
+    '==': nil,
+    'p': ->(arg, io:) { io.puts(arg.inspect) },
+  }.freeze
 
   def execute(instruction)
     case instruction.name
@@ -40,11 +50,21 @@ class VM
         @index += 1
       end
     when :end_def
+      @scope_stack.pop
       @index = @call_stack.pop.fetch(:return_index)
     when :call
       args = @stack.pop(instruction.extra_arg)
-      @call_stack << { return_index: @index, args: args }
-      @index = @methods.fetch(instruction.arg) - 1
+      if BUILT_IN_METHODS.key?(instruction.arg)
+        if (built_in_method = BUILT_IN_METHODS[instruction.arg])
+          @stack << built_in_method.call(*args, io: @io)
+        else
+          @stack << args.first.send(instruction.arg, *args[1..])
+        end
+      else
+        @call_stack << { return_index: @index, args: args }
+        @scope_stack << { vars: {} }
+        @index = @methods.fetch(instruction.arg) - 1
+      end
     when :push_arg
       @stack << @call_stack.last.fetch(:args)[instruction.arg]
     when :if

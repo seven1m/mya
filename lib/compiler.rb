@@ -89,7 +89,8 @@ class Compiler
       @instructions << Instruction.new(:end_def, arg: name)
       instruction
     when :call
-      _, _receiver, name, *args = node
+      _, receiver, name, *args = node
+      args.unshift(receiver) if receiver
       arg_instructions = args.map do |arg|
         transform(arg)
       end

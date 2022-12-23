@@ -132,6 +132,22 @@ describe Compiler do
     expect(e.message).must_equal "Argument 'a' in method 'foo' was called with more than one type: [:int, :str]"
   end
 
+  it 'compiles operator expressions' do
+    code = <<~CODE
+      1 + 2
+      3 == 4
+    CODE
+    expect(compile(code)).must_equal [
+      { type: :int, instruction: [:push_int, 1] },
+      { type: :int, instruction: [:push_int, 2] },
+      { type: :int, instruction: [:call, :+, 2] },
+
+      { type: :int, instruction: [:push_int, 3] },
+      { type: :int, instruction: [:push_int, 4] },
+      { type: :int, instruction: [:call, :==, 2] }
+    ]
+  end
+
   it 'compiles if expressions' do
     code = <<~CODE
       if 1
@@ -160,5 +176,41 @@ describe Compiler do
     CODE
     e = expect { compile(code) }.must_raise TypeError
     expect(e.message).must_equal "Instruction 'if' could have more than one type: [:int, :str]"
+  end
+
+  it 'compiles examples/fib.rb' do
+    code = File.read(File.expand_path('../examples/fib.rb', __dir__))
+    expect(compile(code)).must_equal_with_diff [
+      { type: :int, instruction: [:def, :fib] },
+      { type: :int, instruction: [:push_arg, 0] },
+      { type: :int, instruction: [:set_var, :n] },
+      { type: :int, instruction: [:push_var, :n] },
+      { type: :int, instruction: [:push_int, 0] },
+      { type: :int, instruction: [:call, :==, 2] },
+      { type: :int, instruction: [:if] },
+      { type: :int, instruction: [:push_int, 0] },
+      { type: nil, instruction: [:else] },
+      { type: :int, instruction: [:push_var, :n] },
+      { type: :int, instruction: [:push_int, 1] },
+      { type: :int, instruction: [:call, :==, 2] },
+      { type: :int, instruction: [:if] },
+      { type: :int, instruction: [:push_int, 1] },
+      { type: nil, instruction: [:else] },
+      { type: :int, instruction: [:push_var, :n] },
+      { type: :int, instruction: [:push_int, 1] },
+      { type: :int, instruction: [:call, :-, 2] },
+      { type: :int, instruction: [:call, :fib, 1] },
+      { type: :int, instruction: [:push_var, :n] },
+      { type: :int, instruction: [:push_int, 2] },
+      { type: :int, instruction: [:call, :-, 2] },
+      { type: :int, instruction: [:call, :fib, 1] },
+      { type: :int, instruction: [:call, :+, 2] },
+      { type: nil, instruction: [:end_if] },
+      { type: nil, instruction: [:end_if] },
+      { type: nil, instruction: [:end_def, :fib] },
+      { type: :int, instruction: [:push_int, 15] },
+      { type: :int, instruction: [:call, :fib, 1] },
+      { type: :int, instruction: [:call, :p, 1] }
+    ]
   end
 end

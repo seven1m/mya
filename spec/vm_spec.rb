@@ -1,9 +1,10 @@
 require_relative './spec_helper'
+require 'stringio'
 
 describe VM do
-  def execute(code)
+  def execute(code, io: $stdout)
     instructions = Compiler.new(code).compile
-    VM.new(instructions).run
+    VM.new(instructions, io: io).run
   end
 
   it 'evaluates integers' do
@@ -37,7 +38,7 @@ describe VM do
   it 'evaluates method definitions with arguments' do
     code = <<~CODE
       def foo(a, b)
-        bar(b)
+        bar(b - 10)
       end
 
       def bar(x)
@@ -46,7 +47,29 @@ describe VM do
 
       foo('foo', 100)
     CODE
+    expect(execute(code)).must_equal(90)
+  end
+
+  it 'does not stomp on method arguments' do
+    code = <<~CODE
+      def foo(a, b)
+        bar(b - 10)
+        b
+      end
+
+      def bar(b)
+        b
+      end
+
+      foo('foo', 100)
+    CODE
     expect(execute(code)).must_equal(100)
+  end
+
+  it 'evaluates operator expressions' do
+    expect(execute('1 + 2')).must_equal 3
+    expect(execute('3 == 3')).must_equal true
+    expect(execute('3 == 4')).must_equal false
   end
 
   it 'evaluates if expressions' do
@@ -102,5 +125,13 @@ describe VM do
       end
     CODE
     expect(execute(code)).must_equal(5)
+  end
+
+  it 'evaluates examples/fib.rb' do
+    code = File.read(File.expand_path('../examples/fib.rb', __dir__))
+    io = StringIO.new
+    execute(code, io: io)
+    io.rewind
+    expect(io.read).must_equal("610\n")
   end
 end
