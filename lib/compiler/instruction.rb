@@ -34,7 +34,7 @@ class Compiler
 
       unique_types = @dependencies.map(&:type!).compact.uniq
 
-      if unique_types.size == 0
+      if unique_types.empty?
         raise TypeError, "Not enough information to infer type of instruction '#{@name}'"
       elsif unique_types.size == 1
         unique_types.first

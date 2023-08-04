@@ -4,7 +4,7 @@ require 'stringio'
 describe VM do
   def execute(code, io: $stdout)
     instructions = Compiler.new(code).compile
-    VM.new(instructions, io: io).run
+    VM.new(instructions, io:).run
   end
 
   it 'evaluates integers' do
@@ -130,7 +130,7 @@ describe VM do
   it 'evaluates examples/fib.rb' do
     code = File.read(File.expand_path('../examples/fib.rb', __dir__))
     io = StringIO.new
-    execute(code, io: io)
+    execute(code, io:)
     io.rewind
     expect(io.read).must_equal("610\n")
   end

@@ -1,6 +1,5 @@
 require 'minitest/assertions'
 require 'tempfile'
-require 'pp'
 
 module Minitest::Assertions
   def assert_equal_with_diff(expected, actual)

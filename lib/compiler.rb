@@ -57,7 +57,7 @@ class Compiler
     when :lvar
       _, name = node
       instruction = Instruction.new(:push_var, arg: name)
-      instruction.add_dependency(VariableDependency.new(name: name, scope: scope))
+      instruction.add_dependency(VariableDependency.new(name:, scope:))
       @instructions << instruction
       instruction
     when :defn
@@ -76,7 +76,7 @@ class Compiler
           )
         )
         @instructions << i1
-        i2 = Instruction.new(:set_var, arg: arg)
+        i2 = Instruction.new(:set_var, arg:)
         i2.add_dependency(i1)
         @instructions << i2
         set_var(arg, i2)
@@ -96,7 +96,7 @@ class Compiler
       end
       @calls[name] << { args: arg_instructions }
       instruction = Instruction.new(:call, arg: name, extra_arg: args.size)
-      instruction.add_dependency(MethodDependency.new(name: name, methods: @methods))
+      instruction.add_dependency(MethodDependency.new(name:, methods: @methods))
       @instructions << instruction
       instruction
     when :if
@@ -128,22 +128,18 @@ class Compiler
     vars[name] ||= []
     vars[name] << instruction
     unique_types = vars[name].map do |dep|
-      begin
-        dep.type!
-      rescue TypeError
-        # If we don't yet know the type for this dependency,
-        # that's fine, because we might know it later.
-      end
+      dep.type!
+    rescue TypeError
+      # If we don't yet know the type for this dependency,
+      # that's fine, because we might know it later.
     end.compact.uniq
-    if unique_types.size > 1
-      raise TypeError, "Variable a was set with more than one type: #{unique_types.inspect}"
-    end
+    return unless unique_types.size > 1
+
+    raise TypeError, "Variable a was set with more than one type: #{unique_types.inspect}"
   end
 
   def set_method(name, instruction)
-    if @methods[name]
-      raise TypeError, 'TODO'
-    end
+    raise TypeError, 'TODO' if @methods[name]
 
     @methods[name] = instruction
   end

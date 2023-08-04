@@ -29,7 +29,7 @@ class VM
     '*': nil,
     '/': nil,
     '==': nil,
-    'p': ->(arg, io:) { io.puts(arg.inspect) },
+    'p': ->(arg, io:) { io.puts(arg.inspect) }
   }.freeze
 
   def execute(instruction)
@@ -46,22 +46,20 @@ class VM
       @stack << vars.fetch(instruction.arg)
     when :def
       @methods[instruction.arg] = @index + 1
-      until @instructions[@index].name == :end_def
-        @index += 1
-      end
+      @index += 1 until @instructions[@index].name == :end_def
     when :end_def
       @scope_stack.pop
       @index = @call_stack.pop.fetch(:return_index)
     when :call
       args = @stack.pop(instruction.extra_arg)
       if BUILT_IN_METHODS.key?(instruction.arg)
-        if (built_in_method = BUILT_IN_METHODS[instruction.arg])
-          @stack << built_in_method.call(*args, io: @io)
-        else
-          @stack << args.first.send(instruction.arg, *args[1..])
-        end
+        @stack << if (built_in_method = BUILT_IN_METHODS[instruction.arg])
+                    built_in_method.call(*args, io: @io)
+                  else
+                    args.first.send(instruction.arg, *args[1..])
+                  end
       else
-        @call_stack << { return_index: @index, args: args }
+        @call_stack << ({ return_index: @index, args: })
         @scope_stack << { vars: {} }
         @index = @methods.fetch(instruction.arg) - 1
       end

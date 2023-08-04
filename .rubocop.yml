@@ -1,0 +1,23 @@
+Lint/BooleanSymbol:
+  Enabled: false
+
+Metrics:
+  Enabled: false
+
+Metrics/LineLength:
+  Max: 120
+
+Naming/MethodParameterName:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/NumericPredicate:
+  Enabled: false

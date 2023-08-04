@@ -1,7 +1,7 @@
-source "https://rubygems.org"
+source 'https://rubygems.org'
 
-gem 'natalie_parser'
 gem 'minitest'
 gem 'minitest-focus'
 gem 'minitest-reporters'
+gem 'natalie_parser'
 gem 'rake'
