@@ -1,5 +1,7 @@
 # Mya
 
+[![Specs](https://github.com/seven1m/mya/actions/workflows/specs.yml/badge.svg)](https://github.com/seven1m/mya/actions/workflows/specs.yml)
+
 This is a work-in-progress statically-typed compiler for a language with a Ruby-like syntax.
 
 I have documented some of my progress on this project via my YouTube channel, in a playlist
