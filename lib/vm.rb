@@ -1,5 +1,5 @@
 class VM
-  def initialize(instructions, io: $stdou)
+  def initialize(instructions, io: $stdout)
     @instructions = instructions
     @stack = []
     @scope_stack = [{ vars: {} }]
