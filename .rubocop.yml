@@ -1,3 +1,6 @@
+Layout/LeadingCommentSpace:
+  Enabled: false
+
 Lint/BooleanSymbol:
   Enabled: false
 

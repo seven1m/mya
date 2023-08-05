@@ -1,8 +1,17 @@
+GIT
+  remote: https://github.com/seven1m/ruby-llvm.git
+  revision: 0d671011419d881b730ee1bd721ac8e08ee3b1e9
+  specs:
+    ruby-llvm (16.0.0)
+      ffi (~> 1.13)
+      rake (>= 12, < 14)
+
 GEM
   remote: https://rubygems.org/
   specs:
     ansi (1.5.0)
     builder (3.2.4)
+    ffi (1.15.5)
     minitest (5.16.3)
     minitest-focus (1.3.1)
       minitest (>= 4, < 6)
@@ -24,6 +33,7 @@ DEPENDENCIES
   minitest-reporters
   natalie_parser
   rake
+  ruby-llvm!
 
 BUNDLED WITH
    2.3.26
