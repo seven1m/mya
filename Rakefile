@@ -3,7 +3,8 @@ task :spec do
 end
 
 task :watch do
-  sh "ls **/*.rb | entr -c -s 'bundle exec rake spec'"
+  files = Dir['**/*.rb']
+  sh "ls #{files.join(' ')} | entr -c -s 'bundle exec rake spec'"
 end
 
 task :docker_spec do
