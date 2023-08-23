@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+
+require_relative '../lib/mya'
+
+args = ARGV.dup
+jit = args.delete('--jit')
+
+code = if args.first == '-e'
+         args[1]
+       else
+         File.read(args.first)
+       end
+
+instructions = Compiler.new(code).compile
+
+if jit
+  p JIT.new(instructions).run
+else
+  p VM.new(instructions).run
+end
