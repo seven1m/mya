@@ -2,7 +2,7 @@ require 'llvm/core'
 require 'llvm/execution_engine'
 
 class JIT
-  def initialize(instructions, io: $stdout)
+  def initialize(instructions, io: $stdout, dump_jit: false)
     @instructions = instructions
     @stack = []
     @scope_stack = [{ vars: {} }]
@@ -10,6 +10,7 @@ class JIT
     @if_depth = 0
     @methods = {}
     @io = io
+    @dump_jit = dump_jit
     @module = LLVM::Module.new('jit')
   end
 
@@ -37,7 +38,7 @@ class JIT
       end
     end
 
-    #@module.dump
+    @module.dump if @dump_jit
 
     LLVM.init_jit
 

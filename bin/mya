@@ -3,7 +3,8 @@
 require_relative '../lib/mya'
 
 args = ARGV.dup
-jit = args.delete('--jit')
+dump_jit = args.delete('--dump-jit')
+jit = args.delete('--jit') || dump_jit
 
 code = if args.first == '-e'
          args[1]
@@ -14,7 +15,7 @@ code = if args.first == '-e'
 instructions = Compiler.new(code).compile
 
 if jit
-  p JIT.new(instructions).run
+  p JIT.new(instructions, dump_jit:).run
 else
   p VM.new(instructions).run
 end
