@@ -44,7 +44,7 @@ class Compiler
     end
 
     def inspect
-      "<Instruction #{@name}>"
+      "<Instruction #{@name}, arg: #{@arg.inspect}>"
     end
   end
 end
