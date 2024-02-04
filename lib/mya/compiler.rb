@@ -59,9 +59,10 @@ class Compiler
       instruction
     when Prism::DefNode
       @scope_stack << { vars: {} }
-      instruction = Instruction.new(:def, arg: node.name)
+      params = (node.parameters&.requireds || [])
+      instruction = Instruction.new(:def, arg: node.name, extra_arg: params.size)
       @instructions << instruction
-      (node.parameters&.requireds || []).each_with_index do |arg, index|
+      params.each_with_index do |arg, index|
         i1 = Instruction.new(:push_arg, arg: index)
         i1.add_dependency(
           CallArgDependency.new(
