@@ -87,9 +87,9 @@ class JIT
       end
       @stack << str
     when :push_true
-      @stack << LLVM::Int(1)
+      @stack << LLVM::TRUE
     when :push_false
-      @stack << LLVM::Int(0)
+      @stack << LLVM::FALSE
     when :set_var
       value = @stack.pop
       variable = builder.alloca(value.type)
