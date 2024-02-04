@@ -15,10 +15,10 @@ describe JIT do
     expect(execute('"foo"')).must_equal('foo')
   end
 
-  #it 'evaluates booleans' do
-    #expect(execute('true')).must_equal(true)
-    #expect(execute('false')).must_equal(false)
-  #end
+  it 'evaluates booleans' do
+    expect(execute('true')).must_equal(true)
+    expect(execute('false')).must_equal(false)
+  end
 
   #it 'evaluates variables set and get' do
     #expect(execute('a = 1; a')).must_equal(1)
@@ -66,11 +66,14 @@ describe JIT do
     #expect(execute(code)).must_equal(100)
   #end
 
-  #it 'evaluates operator expressions' do
-    #expect(execute('1 + 2')).must_equal 3
-    #expect(execute('3 == 3')).must_equal true
-    #expect(execute('3 == 4')).must_equal false
-  #end
+  it 'evaluates operator expressions' do
+    expect(execute('1 + 2')).must_equal 3
+    expect(execute('3 - 1')).must_equal 2
+    expect(execute('2 * 3')).must_equal 6
+    expect(execute('6 / 2')).must_equal 3
+    expect(execute('3 == 3')).must_equal true
+    expect(execute('3 == 4')).must_equal false
+  end
 
   #it 'evaluates if expressions' do
     #code = <<~CODE

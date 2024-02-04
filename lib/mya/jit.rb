@@ -17,7 +17,7 @@ class JIT
   attr_reader :instructions
 
   def run
-    return_type = @instructions.last.type
+    return_type = @instructions.last.type!
 
     main = @module.functions.add('main', [], llvm_type(return_type)) do |function|
       function.basic_blocks.append.build do |builder|
@@ -45,10 +45,13 @@ class JIT
     engine = LLVM::JITCompiler.new(@module)
     value = engine.run_function(main)
     return_value = case return_type
+                   when :bool
+                     value.to_i == -1
                    when :int
                      value.to_i
                    when :str
                      value.to_ptr.read_pointer.read_string
+                     #value.to_ptr.read_string
                    end
     engine.dispose
 
@@ -58,11 +61,11 @@ class JIT
   private
 
   BUILT_IN_METHODS = {
-    '+': nil,
-    '-': nil,
-    '*': nil,
-    '/': nil,
-    '==': nil,
+    '+': ->(builder, lhs, rhs) { builder.add(lhs, rhs) },
+    '-': ->(builder, lhs, rhs) { builder.sub(lhs, rhs) },
+    '*': ->(builder, lhs, rhs) { builder.mul(lhs, rhs) },
+    '/': ->(builder, lhs, rhs) { builder.sdiv(lhs, rhs) },
+    '==': ->(builder, lhs, rhs) { builder.icmp(:eq, lhs, rhs) },
     'p': ->(arg, io:) { io.puts(arg.inspect) }
   }.freeze
 
@@ -75,13 +78,11 @@ class JIT
       str = @module.globals.add(LLVM::ConstantArray.string(instruction.arg), 'str') do |var|
         var.initializer = LLVM::ConstantArray.string(instruction.arg)
       end
-      var = builder.alloca(str.type)
-      builder.store(str, var)
-      @stack << builder.load(var)
+      @stack << str
     when :push_true
-      @stack << true
+      @stack << LLVM::Int(1)
     when :push_false
-      @stack << false
+      @stack << LLVM::Int(0)
     when :set_var
       vars[instruction.arg] = @stack.pop
     when :push_var
@@ -94,13 +95,10 @@ class JIT
       @index = @call_stack.pop.fetch(:return_index)
     when :call
       args = @stack.pop(instruction.extra_arg)
-      if BUILT_IN_METHODS.key?(instruction.arg)
-        @stack << if (built_in_method = BUILT_IN_METHODS[instruction.arg])
-                    built_in_method.call(*args, io: @io)
-                  else
-                    args.first.send(instruction.arg, *args[1..])
-                  end
+      if (built_in_method = BUILT_IN_METHODS[instruction.arg])
+        @stack << built_in_method.call(builder, *args)
       else
+        raise "TODO: implement user defined method #{instruction.arg}"
         @call_stack << ({ return_index: @index, args: })
         @scope_stack << { vars: {} }
         @index = @methods.fetch(instruction.arg) - 1
@@ -147,12 +145,14 @@ class JIT
 
   def llvm_type(type)
     case type
+    when :bool
+      LLVM::Int1
     when :int
       LLVM::Int32
     when :str
       LLVM::Type.pointer(LLVM::UInt8)
     else
-      raise "Unknown type: #{type}"
+      raise "Unknown type: #{type.inspect}"
     end
   end
 end
