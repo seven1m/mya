@@ -35,36 +35,36 @@ describe JIT do
     expect(execute(code)).must_equal('foo')
   end
 
-  #it 'evaluates method definitions with arguments' do
-    #code = <<~CODE
-      #def foo(a, b)
-        #bar(b - 10)
-      #end
+  it 'evaluates method definitions with arguments' do
+    code = <<~CODE
+      def bar(x)
+        x
+      end
 
-      #def bar(x)
-        #x
-      #end
+      def foo(a, b)
+        bar(b - 10)
+      end
 
-      #foo('foo', 100)
-    #CODE
-    #expect(execute(code)).must_equal(90)
-  #end
+      foo('foo', 100)
+    CODE
+    expect(execute(code)).must_equal(90)
+  end
 
-  #it 'does not stomp on method arguments' do
-    #code = <<~CODE
-      #def foo(a, b)
-        #bar(b - 10)
-        #b
-      #end
+  it 'does not stomp on method arguments' do
+    code = <<~CODE
+      def bar(b)
+        b
+      end
 
-      #def bar(b)
-        #b
-      #end
+      def foo(a, b)
+        bar(b - 10)
+        b
+      end
 
-      #foo('foo', 100)
-    #CODE
-    #expect(execute(code)).must_equal(100)
-  #end
+      foo('foo', 100)
+    CODE
+    expect(execute(code)).must_equal(100)
+  end
 
   it 'evaluates operator expressions' do
     expect(execute('1 + 2')).must_equal 3

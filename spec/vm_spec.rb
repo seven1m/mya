@@ -37,12 +37,12 @@ describe VM do
 
   it 'evaluates method definitions with arguments' do
     code = <<~CODE
-      def foo(a, b)
-        bar(b - 10)
-      end
-
       def bar(x)
         x
+      end
+
+      def foo(a, b)
+        bar(b - 10)
       end
 
       foo('foo', 100)
@@ -52,12 +52,12 @@ describe VM do
 
   it 'does not stomp on method arguments' do
     code = <<~CODE
-      def foo(a, b)
-        bar(b - 10)
+      def bar(b)
         b
       end
 
-      def bar(b)
+      def foo(a, b)
+        bar(b - 10)
         b
       end
 

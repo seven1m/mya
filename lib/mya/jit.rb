@@ -56,12 +56,14 @@ class JIT
   def build_function(name, arg_types, return_type)
     @module.functions.add(name, arg_types, return_type) do |function|
       function.basic_blocks.append.build do |builder|
+        @scope_stack << { function:, vars: {} }
         while @index < @instructions.size
           instruction = @instructions[@index]
           build(instruction, builder)
           @index += 1
           break if @instructions[@index]&.name == :end_def
         end
+        @scope_stack.pop
         return_value = @stack.pop
         case return_type
         when :str
@@ -97,23 +99,24 @@ class JIT
       variable = vars.fetch(instruction.arg)
       @stack << builder.load(variable)
     when :def
-      name = instruction.arg
       @index += 1
-      @methods[name] = build_function(name, [], llvm_type(instruction.type!))
+      name = instruction.arg
+      arg_types = (0...instruction.extra_arg).map { |i| llvm_type(@instructions.fetch(@index + (i * 2)).type!) }
+      @methods[name] = build_function(name, arg_types, llvm_type(instruction.type!))
     when :end_def
-      @scope_stack.pop
       @index = @call_stack.pop.fetch(:return_index)
     when :call
       args = @stack.pop(instruction.extra_arg)
       if (built_in_method = BUILT_IN_METHODS[instruction.arg])
         @stack << built_in_method.call(builder, *args)
       else
-        function = @methods.fetch(instruction.arg)
-        args = []
+        name = instruction.arg
+        function = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
         @stack << builder.call(function, *args)
       end
     when :push_arg
-      @stack << @call_stack.last.fetch(:args)[instruction.arg]
+      function = @scope_stack.last.fetch(:function)
+      @stack << function.params[instruction.arg]
     when :if
       condition = @stack.pop
       if condition
