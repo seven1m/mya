@@ -24,7 +24,6 @@ class Compiler
     INSTRUCTIONS_WITH_NO_TYPE = %i[
       else
       end_def
-      end_if
     ].freeze
 
     def type!

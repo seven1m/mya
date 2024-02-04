@@ -162,7 +162,7 @@ describe Compiler do
       { type: :int, instruction: [:push_int, 2] },
       { type: nil, instruction: [:else] },
       { type: :int, instruction: [:push_int, 3] },
-      { type: nil, instruction: [:end_if] }
+      { type: :int, instruction: [:end_if] }
     ]
   end
 
@@ -205,8 +205,8 @@ describe Compiler do
       { type: :int, instruction: [:call, :-, 2] },
       { type: :int, instruction: [:call, :fib, 1] },
       { type: :int, instruction: [:call, :+, 2] },
-      { type: nil, instruction: [:end_if] },
-      { type: nil, instruction: [:end_if] },
+      { type: :int, instruction: [:end_if] },
+      { type: :int, instruction: [:end_if] },
       { type: nil, instruction: %i[end_def fib] },
       { type: :int, instruction: [:push_int, 15] },
       { type: :int, instruction: [:call, :fib, 1] },

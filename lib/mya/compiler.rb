@@ -102,9 +102,11 @@ class Compiler
       true_instruction = transform(node.statements)
       @instructions << Instruction.new(:else)
       false_instruction = transform(node.consequent)
-      @instructions << Instruction.new(:end_if)
       instruction.add_dependency(true_instruction)
       instruction.add_dependency(false_instruction)
+      end_if_instruction = Instruction.new(:end_if)
+      @instructions << end_if_instruction
+      end_if_instruction.add_dependency(instruction)
       instruction
     when Prism::ElseNode
       transform(node.statements)
