@@ -20,9 +20,9 @@ describe JIT do
     expect(execute('false')).must_equal(false)
   end
 
-  #it 'evaluates variables set and get' do
-    #expect(execute('a = 1; a')).must_equal(1)
-  #end
+  it 'evaluates variables set and get' do
+    expect(execute('a = 1; a + a')).must_equal(2)
+  end
 
   #it 'evaluates method definitions' do
     #code = <<~CODE

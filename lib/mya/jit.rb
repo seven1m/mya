@@ -84,9 +84,13 @@ class JIT
     when :push_false
       @stack << LLVM::Int(0)
     when :set_var
-      vars[instruction.arg] = @stack.pop
+      value = @stack.pop
+      variable = builder.alloca(value.type)
+      builder.store(value, variable)
+      vars[instruction.arg] = variable
     when :push_var
-      @stack << vars.fetch(instruction.arg)
+      variable = vars.fetch(instruction.arg)
+      @stack << builder.load(variable)
     when :def
       @methods[instruction.arg] = @index + 1
       @index += 1 until @instructions[@index].name == :end_def
