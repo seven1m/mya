@@ -19,24 +19,8 @@ class JIT
   def run
     return_type = @instructions.last.type!
 
-    main = @module.functions.add('main', [], llvm_type(return_type)) do |function|
-      function.basic_blocks.append.build do |builder|
-        @index = 0
-        while @index < @instructions.size
-          instruction = @instructions[@index]
-          build(instruction, builder)
-          @index += 1
-        end
-        return_value = @stack.pop
-        case return_type
-        when :str
-          zero = LLVM.Int(0)
-          builder.ret builder.gep(return_value, zero)
-        else
-          builder.ret return_value
-        end
-      end
-    end
+    @index = 0
+    main = build_function('main', [], llvm_type(return_type))
 
     @module.dump if @dump_jit
 
@@ -69,6 +53,27 @@ class JIT
     'p': ->(arg, io:) { io.puts(arg.inspect) }
   }.freeze
 
+  def build_function(name, arg_types, return_type)
+    @module.functions.add(name, arg_types, return_type) do |function|
+      function.basic_blocks.append.build do |builder|
+        while @index < @instructions.size
+          instruction = @instructions[@index]
+          build(instruction, builder)
+          @index += 1
+          break if @instructions[@index]&.name == :end_def
+        end
+        return_value = @stack.pop
+        case return_type
+        when :str
+          zero = LLVM.Int(0)
+          builder.ret builder.gep(return_value, zero)
+        else
+          builder.ret return_value
+        end
+      end
+    end
+  end
+
   def build(instruction, builder)
     case instruction.name
     when :push_int
@@ -92,8 +97,9 @@ class JIT
       variable = vars.fetch(instruction.arg)
       @stack << builder.load(variable)
     when :def
-      @methods[instruction.arg] = @index + 1
-      @index += 1 until @instructions[@index].name == :end_def
+      name = instruction.arg
+      @index += 1
+      @methods[name] = build_function(name, [], llvm_type(instruction.type!))
     when :end_def
       @scope_stack.pop
       @index = @call_stack.pop.fetch(:return_index)
@@ -102,10 +108,9 @@ class JIT
       if (built_in_method = BUILT_IN_METHODS[instruction.arg])
         @stack << built_in_method.call(builder, *args)
       else
-        raise "TODO: implement user defined method #{instruction.arg}"
-        @call_stack << ({ return_index: @index, args: })
-        @scope_stack << { vars: {} }
-        @index = @methods.fetch(instruction.arg) - 1
+        function = @methods.fetch(instruction.arg)
+        args = []
+        @stack << builder.call(function, *args)
       end
     when :push_arg
       @stack << @call_stack.last.fetch(:args)[instruction.arg]

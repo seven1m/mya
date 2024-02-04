@@ -24,16 +24,16 @@ describe JIT do
     expect(execute('a = 1; a + a')).must_equal(2)
   end
 
-  #it 'evaluates method definitions' do
-    #code = <<~CODE
-      #def foo
-        #'foo'
-      #end
+  it 'evaluates method definitions' do
+    code = <<~CODE
+      def foo
+        'foo'
+      end
 
-      #foo
-    #CODE
-    #expect(execute(code)).must_equal('foo')
-  #end
+      foo
+    CODE
+    expect(execute(code)).must_equal('foo')
+  end
 
   #it 'evaluates method definitions with arguments' do
     #code = <<~CODE
