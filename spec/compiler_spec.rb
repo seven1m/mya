@@ -144,7 +144,7 @@ describe Compiler do
 
       { type: :int, instruction: [:push_int, 3] },
       { type: :int, instruction: [:push_int, 4] },
-      { type: :int, instruction: [:call, :==, 2] }
+      { type: :bool, instruction: [:call, :==, 2] }
     ]
   end
 
@@ -186,13 +186,13 @@ describe Compiler do
       { type: :int, instruction: %i[set_var n] },
       { type: :int, instruction: %i[push_var n] },
       { type: :int, instruction: [:push_int, 0] },
-      { type: :int, instruction: [:call, :==, 2] },
+      { type: :bool, instruction: [:call, :==, 2] },
       { type: :int, instruction: [:if] },
       { type: :int, instruction: [:push_int, 0] },
       { type: nil, instruction: [:else] },
       { type: :int, instruction: %i[push_var n] },
       { type: :int, instruction: [:push_int, 1] },
-      { type: :int, instruction: [:call, :==, 2] },
+      { type: :bool, instruction: [:call, :==, 2] },
       { type: :int, instruction: [:if] },
       { type: :int, instruction: [:push_int, 1] },
       { type: nil, instruction: [:else] },
