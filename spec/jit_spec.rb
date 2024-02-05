@@ -75,60 +75,81 @@ describe JIT do
     expect(execute('3 == 4')).must_equal false
   end
 
-  #it 'evaluates if expressions' do
-    #code = <<~CODE
-      #if false
-        #if true
-          #1
-        #else
-          #2
-        #end
-      #else
-        #if true
-          #3           # <-- this one
-        #else
-          #4
-        #end
-      #end
-    #CODE
-    #expect(execute(code)).must_equal(3)
+  it 'evaluates simple if expressions' do
+    code = <<~CODE
+      if true
+        3
+      else
+        4
+      end
+    CODE
+    expect(execute(code)).must_equal(3)
 
-    #code = <<~CODE
-      #if true
-        #if false
-          #1
-        #else
-          #2           # <-- this one
-        #end
-      #else
-        #if false
-          #3
-        #else
-          #4
-        #end
-      #end
-    #CODE
-    #expect(execute(code)).must_equal(2)
+    code = <<~CODE
+      if false
+        3
+      else
+        4
+      end
+    CODE
+    expect(execute(code)).must_equal(4)
+  end
 
-    #code = <<~CODE
-      #if false
-        #if false
-          #1
-        #else
-          #2
-        #end
-      #elsif false
-        #3
-      #else
-        #if false
-          #4
-        #else
-          #5           # <-- this one
-        #end
-      #end
-    #CODE
-    #expect(execute(code)).must_equal(5)
-  #end
+  it 'evaluates nested if expressions' do
+    skip
+    code = <<~CODE
+      if false
+        if true
+          1
+        else
+          2
+        end
+      else
+        if true
+          3           # <-- this one
+        else
+          4
+        end
+      end
+    CODE
+    expect(execute(code)).must_equal(3)
+
+    code = <<~CODE
+      if true
+        if false
+          1
+        else
+          2           # <-- this one
+        end
+      else
+        if false
+          3
+        else
+          4
+        end
+      end
+    CODE
+    expect(execute(code)).must_equal(2)
+
+    code = <<~CODE
+      if false
+        if false
+          1
+        else
+          2
+        end
+      elsif false
+        3
+      else
+        if false
+          4
+        else
+          5           # <-- this one
+        end
+      end
+    CODE
+    expect(execute(code)).must_equal(5)
+  end
 
   #it 'evaluates examples/fib.rb' do
     #code = File.read(File.expand_path('../examples/fib.rb', __dir__))

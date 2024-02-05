@@ -55,28 +55,34 @@ class JIT
 
   def build_function(name, arg_types, return_type)
     @module.functions.add(name, arg_types, return_type) do |function|
+      @scope_stack << { function:, vars: {} }
       function.basic_blocks.append.build do |builder|
-        @scope_stack << { function:, vars: {} }
-        while @index < @instructions.size
-          instruction = @instructions[@index]
-          build(instruction, builder)
-          @index += 1
-          break if @instructions[@index]&.name == :end_def
-        end
-        @scope_stack.pop
-        return_value = @stack.pop
-        case return_type
-        when :str
-          zero = LLVM.Int(0)
-          builder.ret builder.gep(return_value, zero)
-        else
-          builder.ret return_value
+        build_instructions(function, builder, stop_at: [:end_def]) do |return_value|
+          case function.return_type
+          when :str
+            zero = LLVM.Int(0)
+            builder.ret builder.gep(return_value, zero)
+          else
+            builder.ret return_value
+          end
         end
       end
+      @scope_stack.pop
     end
   end
 
-  def build(instruction, builder)
+  def build_instructions(function, builder, stop_at: [])
+    while @index < @instructions.size
+      instruction = @instructions[@index]
+      build(instruction, function, builder)
+      @index += 1
+      break if stop_at.include?(@instructions[@index]&.name)
+    end
+    return_value = @stack.pop
+    yield return_value
+  end
+
+  def build(instruction, function, builder)
     case instruction.name
     when :push_int
       @stack << LLVM::Int(instruction.arg)
@@ -101,7 +107,9 @@ class JIT
     when :def
       @index += 1
       name = instruction.arg
-      arg_types = (0...instruction.extra_arg).map { |i| llvm_type(@instructions.fetch(@index + (i * 2)).type!) }
+      arg_types = (0...instruction.extra_arg).map do |i|
+        llvm_type(@instructions.fetch(@index + (i * 2)).type!)
+      end
       @methods[name] = build_function(name, arg_types, llvm_type(instruction.type!))
     when :end_def
       @index = @call_stack.pop.fetch(:return_index)
@@ -118,13 +126,29 @@ class JIT
       function = @scope_stack.last.fetch(:function)
       @stack << function.params[instruction.arg]
     when :if
+      result = builder.alloca(llvm_type(instruction.type!))
+      then_block = function.basic_blocks.append
+      else_block = function.basic_blocks.append
+      result_block = function.basic_blocks.append
       condition = @stack.pop
-      if condition
-        :noop # just execute next expression
-      else
-        @index += 1
-        skip_to_next_instruction_by_name(:else)
+      @index += 1
+      then_block.build do |then_builder|
+        build_instructions(function, then_builder, stop_at: [:else]) do |value|
+          then_builder.store(value, result)
+          then_builder.br(result_block)
+        end
       end
+      @index += 1
+      else_block.build do |else_builder|
+        build_instructions(function, else_builder, stop_at: [:end_if]) do |value|
+          else_builder.store(value, result)
+          else_builder.br(result_block)
+        end
+      end
+      @index += 1
+      builder.cond(condition, then_block, else_block)
+      builder.position_at_end(result_block)
+      @stack << builder.load(result)
     when :else
       skip_to_next_instruction_by_name(:end_if)
     when :end_if
