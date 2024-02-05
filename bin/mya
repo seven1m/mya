@@ -5,6 +5,7 @@ require_relative '../lib/mya'
 args = ARGV.dup
 dump_jit = args.delete('--dump-jit')
 jit = args.delete('--jit') || dump_jit
+dump_ir = args.delete('--dump-ir')
 
 code = if args.first == '-e'
          args[1]
@@ -13,6 +14,12 @@ code = if args.first == '-e'
        end
 
 instructions = Compiler.new(code).compile
+
+if dump_ir
+  instructions.each_with_index do |instruction, index|
+    puts "#{index}: #{instruction.to_h.inspect}"
+  end
+end
 
 if jit
   p JIT.new(instructions, dump_jit:).run
