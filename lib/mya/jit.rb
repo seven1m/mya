@@ -112,8 +112,8 @@ class JIT
         llvm_type(@instructions.fetch(@index + (i * 2)).type!)
       end
       @methods[name] = build_function(name, arg_types, llvm_type(instruction.type!))
-    when :end_def
-      @index = @call_stack.pop.fetch(:return_index)
+    when :end_def, :end_if, :else
+      raise 'should not reach here'
     when :call
       args = @stack.pop(instruction.extra_arg)
       if (built_in_method = BUILT_IN_METHODS[instruction.arg])
@@ -150,10 +150,6 @@ class JIT
       builder.cond(condition, then_block, else_block)
       builder.position_at_end(result_block)
       @stack << builder.load(result)
-    when :else
-      skip_to_next_instruction_by_name(:end_if)
-    when :end_if
-      :noop
     else
       raise "Unknown instruction: #{instruction.inspect}"
     end
