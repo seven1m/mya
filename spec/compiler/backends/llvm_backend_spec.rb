@@ -1,10 +1,10 @@
-require_relative './spec_helper'
+require_relative '../../spec_helper'
 require 'stringio'
 
-describe JIT do
+describe Compiler::Backends::LLVMBackend do
   def execute(code, io: $stdout)
     instructions = Compiler.new(code).compile
-    JIT.new(instructions, io:).run
+    Compiler::Backends::LLVMBackend.new(instructions, io:).run
   end
 
   it 'evaluates integers' do

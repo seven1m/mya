@@ -5,6 +5,7 @@ require_relative './compiler/dependency'
 require_relative './compiler/call_arg_dependency'
 require_relative './compiler/method_dependency'
 require_relative './compiler/variable_dependency'
+require_relative './compiler/backends/llvm_backend'
 
 class Compiler
   def initialize(code)

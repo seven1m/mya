@@ -3,8 +3,8 @@
 require_relative '../lib/mya'
 
 args = ARGV.dup
-dump_jit = args.delete('--dump-jit')
-jit = args.delete('--jit') || dump_jit
+dump_llvm = args.delete('--dump-llvm')
+llvm = args.delete('--llvm') || dump_llvm
 dump_ir = args.delete('--dump-ir')
 
 code = if args.first == '-e'
@@ -21,8 +21,8 @@ if dump_ir
   end
 end
 
-if jit
-  p JIT.new(instructions, dump_jit:).run
+if llvm
+  p Compiler::Backends::LLVMBackend.new(instructions, dump: dump_llvm).run
 else
   p VM.new(instructions).run
 end
