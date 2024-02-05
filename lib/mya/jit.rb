@@ -21,6 +21,7 @@ class JIT
 
     @index = 0
     main = build_function('main', [], llvm_type(return_type))
+    raise 'Bad code generated' unless main.valid?
 
     @module.dump if @dump_jit
 
