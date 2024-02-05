@@ -132,6 +132,8 @@ class JIT
       else_block = function.basic_blocks.append
       result_block = function.basic_blocks.append
       condition = @stack.pop
+      builder.cond(condition, then_block, else_block)
+      raise 'bad if' if @index >= @instructions.size || @instructions[@index].name != :if
       @index += 1
       then_block.build do |then_builder|
         build_instructions(function, then_builder, stop_at: [:else]) do |value|
@@ -139,6 +141,7 @@ class JIT
           then_builder.br(result_block)
         end
       end
+      raise 'bad else' if @index >= @instructions.size || @instructions[@index].name != :else
       @index += 1
       else_block.build do |else_builder|
         build_instructions(function, else_builder, stop_at: [:end_if]) do |value|
@@ -146,8 +149,6 @@ class JIT
           else_builder.br(result_block)
         end
       end
-      @index += 1
-      builder.cond(condition, then_block, else_block)
       builder.position_at_end(result_block)
       @stack << builder.load(result)
     else

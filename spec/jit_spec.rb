@@ -96,7 +96,6 @@ describe JIT do
   end
 
   it 'evaluates nested if expressions' do
-    skip
     code = <<~CODE
       if false
         if true
