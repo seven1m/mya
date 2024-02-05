@@ -158,19 +158,6 @@ class Compiler
         end
       end
 
-      def skip_to_next_instruction_by_name(name)
-        start_if_depth = @if_depth
-        until @instructions[@index].name == name && @if_depth == start_if_depth
-          case @instructions[@index].name
-          when :if
-            @if_depth += 1
-          when :end_if
-            @if_depth -= 1
-          end
-          @index += 1
-        end
-      end
-
       def scope
         @scope_stack.last
       end
