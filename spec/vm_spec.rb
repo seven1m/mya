@@ -132,6 +132,6 @@ describe VM do
     io = StringIO.new
     execute(code, io:)
     io.rewind
-    expect(io.read).must_equal("610\n")
+    expect(io.read).must_equal("55\n")
   end
 end

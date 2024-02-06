@@ -4,14 +4,13 @@ require 'llvm/execution_engine'
 class Compiler
   module Backends
     class LLVMBackend
-      def initialize(instructions, io: $stdout, dump: false)
+      def initialize(instructions, dump: false)
         @instructions = instructions
         @stack = []
         @scope_stack = [{ vars: {} }]
         @call_stack = []
         @if_depth = 0
         @methods = {}
-        @io = io
         @dump = dump
       end
 
@@ -20,6 +19,11 @@ class Compiler
       def run
         build_module
         execute(@entry)
+      end
+
+      def dump_ir_to_file(path)
+        build_module
+        File.write(path, @module.to_s)
       end
 
       private
@@ -54,7 +58,7 @@ class Compiler
       def build_module
         @module = LLVM::Module.new('llvm')
         @return_type = @instructions.last.type!
-        @entry = @module.functions.add('entry', [], llvm_type(@return_type))
+        @entry = @module.functions.add('main', [], llvm_type(@return_type))
         @index = 0
         build_function(@entry)
         @module.dump if @dump

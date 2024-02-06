@@ -1,10 +1,10 @@
 require_relative '../../spec_helper'
-require 'stringio'
+require 'tempfile'
 
 describe Compiler::Backends::LLVMBackend do
-  def execute(code, io: $stdout)
+  def execute(code)
     instructions = Compiler.new(code).compile
-    Compiler::Backends::LLVMBackend.new(instructions, io:).run
+    Compiler::Backends::LLVMBackend.new(instructions).run
   end
 
   it 'evaluates integers' do
@@ -150,13 +150,16 @@ describe Compiler::Backends::LLVMBackend do
     expect(execute(code)).must_equal(5)
   end
 
-  it 'evaluates examples/fib.rb' do
+  it 'compiles examples/fib.rb to LLVM IR' do
+    temp = Tempfile.create('fib.ll')
+    temp.close
     code = File.read(File.expand_path('../../../examples/fib.rb', __dir__))
-    io = StringIO.new
-    result = execute(code, io:)
-    expect(result).must_equal(610)
-    # FIXME
-    #io.rewind
-    #expect(io.read).must_equal("610\n")
+    instructions = Compiler.new(code).compile
+    Compiler::Backends::LLVMBackend.new(instructions).dump_ir_to_file(temp.path)
+    result = `lli #{temp.path} 2>&1`
+    # TODO: fix the `p` method so it outputs to stdout and stop using the return value. :-)
+    expect($?.exitstatus).must_equal(55)
+  ensure
+    File.unlink(temp.path)
   end
 end

@@ -208,7 +208,7 @@ describe Compiler do
       { type: :int, instruction: [:end_if] },
       { type: :int, instruction: [:end_if] },
       { type: nil, instruction: %i[end_def fib] },
-      { type: :int, instruction: [:push_int, 15] },
+      { type: :int, instruction: [:push_int, 10] },
       { type: :int, instruction: [:call, :fib, 1] },
       { type: :int, instruction: [:call, :p, 1] }
     ]

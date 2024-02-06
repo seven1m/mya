@@ -8,4 +8,4 @@ def fib(n)
   end
 end
 
-p fib(15)
+p fib(10)
