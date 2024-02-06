@@ -1,14 +1,15 @@
 class Compiler
   class Instruction
-    def initialize(name, arg: nil, extra_arg: nil, type: nil)
+    def initialize(name, arg: nil, extra_arg: nil, type: nil, line: nil)
       @name = name
       @arg = arg
       @extra_arg = extra_arg
       @type = type
+      @line = line
       @dependencies = []
     end
 
-    attr_reader :name, :arg, :extra_arg, :type, :dependencies
+    attr_reader :name, :arg, :extra_arg, :type, :line, :dependencies
 
     def to_h
       {
