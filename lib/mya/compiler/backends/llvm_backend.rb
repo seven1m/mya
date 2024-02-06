@@ -22,10 +22,12 @@ class Compiler
         return_type = @instructions.last.type!
 
         @index = 0
-        main = build_function('main', [], llvm_type(return_type))
-        raise 'Bad code generated' unless main.valid?
+        main = @module.functions.add('main', [], llvm_type(return_type))
+        build_function(main)
 
         @module.dump if @dump
+
+        raise 'Bad code generated' unless main.valid?
 
         LLVM.init_jit
 
@@ -53,25 +55,30 @@ class Compiler
         '*': ->(builder, lhs, rhs) { builder.mul(lhs, rhs) },
         '/': ->(builder, lhs, rhs) { builder.sdiv(lhs, rhs) },
         '==': ->(builder, lhs, rhs) { builder.icmp(:eq, lhs, rhs) },
-        'p': ->(arg, io:) { io.puts(arg.inspect) }
+        'p': ->(builder, arg) { arg } # FIXME
+            #printf_type = LLVM::Type.function([LLVM::Int8Ptr], LLVM::Int32, varargs: true)
+            #printf = @module.functions.add('printf', [LLVM::Int] , LLVM::Int )
+            #printf.linkage = :external
+            #printf = @module.external_function('printf', printf_type)
+            #format_str = builder.create_global_string_pointer("%d\n")
+            #args = [format_str,  arg.to_i]
+            #builder.call(printf, args)
       }.freeze
 
-      def build_function(name, arg_types, return_type)
-        @module.functions.add(name, arg_types, return_type) do |function|
-          @scope_stack << { function:, vars: {} }
-          function.basic_blocks.append.build do |builder|
-            build_instructions(function, builder, stop_at: [:end_def]) do |return_value|
-              case function.return_type
-              when :str
-                zero = LLVM.Int(0)
-                builder.ret builder.gep(return_value, zero)
-              else
-                builder.ret return_value
-              end
+      def build_function(function)
+        @scope_stack << { function:, vars: {} }
+        function.basic_blocks.append.build do |builder|
+          build_instructions(function, builder, stop_at: [:end_def]) do |return_value|
+            case function.return_type
+            when :str
+              zero = LLVM.Int(0)
+              builder.ret builder.gep(return_value, zero)
+            else
+              builder.ret return_value
             end
           end
-          @scope_stack.pop
         end
+        @scope_stack.pop
       end
 
       def build_instructions(function, builder, stop_at: [])
@@ -113,13 +120,13 @@ class Compiler
           arg_types = (0...instruction.extra_arg).map do |i|
             llvm_type(@instructions.fetch(@index + (i * 2)).type!)
           end
-          @methods[name] = build_function(name, arg_types, llvm_type(instruction.type!))
-        when :end_def, :end_if, :else
-          raise 'should not reach here'
+          return_type = llvm_type(instruction.type!)
+          @methods[name] = fn  = @module.functions.add(name, arg_types, return_type)
+          build_function(fn)
         when :call
           args = @stack.pop(instruction.extra_arg)
           if (built_in_method = BUILT_IN_METHODS[instruction.arg])
-            @stack << built_in_method.call(builder, *args)
+            @stack << instance_exec(builder, *args, &built_in_method)
           else
             name = instruction.arg
             function = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
@@ -153,6 +160,8 @@ class Compiler
           end
           builder.position_at_end(result_block)
           @stack << builder.load(result)
+        when :end_def, :end_if, :else
+          raise 'should not reach here'
         else
           raise "Unknown instruction: #{instruction.inspect}"
         end

@@ -150,11 +150,13 @@ describe Compiler::Backends::LLVMBackend do
     expect(execute(code)).must_equal(5)
   end
 
-  #it 'evaluates examples/fib.rb' do
-    #code = File.read(File.expand_path('../examples/fib.rb', __dir__))
-    #io = StringIO.new
-    #execute(code, io:)
+  it 'evaluates examples/fib.rb' do
+    code = File.read(File.expand_path('../../../examples/fib.rb', __dir__))
+    io = StringIO.new
+    result = execute(code, io:)
+    expect(result).must_equal(610)
+    # FIXME
     #io.rewind
     #expect(io.read).must_equal("610\n")
-  #end
+  end
 end
