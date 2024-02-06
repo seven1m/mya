@@ -101,7 +101,7 @@ class Compiler
           @stack << LLVM::FALSE
         when :set_var
           value = @stack.pop
-          variable = builder.alloca(value.type)
+          variable = builder.alloca(value.type, "var_#{instruction.arg}")
           builder.store(value, variable)
           vars[instruction.arg] = variable
         when :push_var
@@ -129,7 +129,7 @@ class Compiler
           function = @scope_stack.last.fetch(:function)
           @stack << function.params[instruction.arg]
         when :if
-          result = builder.alloca(llvm_type(instruction.type!))
+          result = builder.alloca(llvm_type(instruction.type!), "if_line_#{instruction.line}")
           then_block = function.basic_blocks.append
           else_block = function.basic_blocks.append
           result_block = function.basic_blocks.append
