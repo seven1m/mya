@@ -13,38 +13,13 @@ class Compiler
         @methods = {}
         @io = io
         @dump = dump
-        @module = LLVM::Module.new('llvm')
       end
 
       attr_reader :instructions
 
       def run
-        return_type = @instructions.last.type!
-
-        @index = 0
-        main = @module.functions.add('main', [], llvm_type(return_type))
-        build_function(main)
-
-        @module.dump if @dump
-
-        raise 'Bad code generated' unless main.valid?
-
-        LLVM.init_jit
-
-        engine = LLVM::JITCompiler.new(@module)
-        value = engine.run_function(main)
-        return_value = case return_type
-                      when :bool
-                        value.to_i == -1
-                      when :int
-                        value.to_i
-                      when :str
-                        value.to_ptr.read_pointer.read_string
-                        #value.to_ptr.read_string
-                      end
-        engine.dispose
-
-        return_value
+        build_module
+        execute(@entry)
       end
 
       private
@@ -64,6 +39,27 @@ class Compiler
             #args = [format_str,  arg.to_i]
             #builder.call(printf, args)
       }.freeze
+
+      def execute(fn)
+        LLVM.init_jit
+
+        engine = LLVM::JITCompiler.new(@module)
+        value = engine.run_function(fn)
+        return_value = llvm_type_to_ruby(value, @return_type)
+        engine.dispose
+
+        return_value
+      end
+
+      def build_module
+        @module = LLVM::Module.new('llvm')
+        @return_type = @instructions.last.type!
+        @entry = @module.functions.add('entry', [], llvm_type(@return_type))
+        @index = 0
+        build_function(@entry)
+        @module.dump if @dump
+        raise 'Bad code generated' unless @module.valid?
+      end
 
       def build_function(function)
         @scope_stack << { function:, vars: {} }
@@ -185,6 +181,18 @@ class Compiler
           LLVM::Type.pointer(LLVM::UInt8)
         else
           raise "Unknown type: #{type.inspect}"
+        end
+      end
+
+      def llvm_type_to_ruby(value, type)
+        case type
+        when :bool
+          value.to_i == -1
+        when :int
+          value.to_i
+        when :str
+          value.to_ptr.read_pointer.read_string
+          #value.to_ptr.read_string
         end
       end
     end
