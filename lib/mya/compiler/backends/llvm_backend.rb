@@ -38,7 +38,7 @@ class Compiler
         '*': ->(builder, lhs, rhs) { builder.mul(lhs, rhs) },
         '/': ->(builder, lhs, rhs) { builder.sdiv(lhs, rhs) },
         '==': ->(builder, lhs, rhs) { builder.icmp(:eq, lhs, rhs) },
-        'p': ->(builder, arg) { compile_p(builder, arg) },
+        'puts': ->(builder, arg) { compile_puts(builder, arg) },
       }.freeze
 
       def execute(fn)
@@ -198,17 +198,17 @@ class Compiler
         end
       end
 
-      def compile_p(builder, arg)
+      def compile_puts(builder, arg)
         case arg.type
         when LLVM::IntType
-          builder.call(fn_p_int, arg)
+          builder.call(fn_puts_int, arg)
         else
           raise "Unhandled type: #{arg.class}"
         end
       end
 
-      def fn_p_int
-        @fn_p_int ||= @module.functions.add('p_int', [LLVM::Int32], LLVM::Int32)
+      def fn_puts_int
+        @fn_puts_int ||= @module.functions.add('puts_int', [LLVM::Int32], LLVM::Int32)
       end
     end
   end

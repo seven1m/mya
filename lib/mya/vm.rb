@@ -29,7 +29,7 @@ class VM
     '*': nil,
     '/': nil,
     '==': nil,
-    'p': ->(arg, io:) { io.puts(arg.inspect); arg }
+    'puts': ->(arg, io:) { io.puts(arg); arg }
   }.freeze
 
   def execute(instruction)

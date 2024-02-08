@@ -6,7 +6,7 @@ class Compiler
       '*': { args: %i[int int], return_type: :int },
       '/': { args: %i[int int], return_type: :int },
       '==': { args: %i[int int], return_type: :bool },
-      'p': { args: [:int], return_type: :int }
+      'puts': { args: [:int], return_type: :int }
     }.freeze
 
     def initialize(name:, methods:)
