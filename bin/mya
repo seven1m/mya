@@ -22,7 +22,7 @@ if dump_ir
 end
 
 if llvm
-  p Compiler::Backends::LLVMBackend.new(instructions, dump: dump_llvm).run
+  Compiler::Backends::LLVMBackend.new(instructions, dump: dump_llvm).run
 else
-  p VM.new(instructions).run
+  VM.new(instructions).run
 end

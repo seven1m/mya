@@ -1,4 +1,8 @@
-task :spec do
+task default: :spec
+
+task build: ['build/lib.ll']
+
+task spec: :build do
   require_relative 'spec/all'
 end
 
@@ -11,4 +15,7 @@ task :docker_spec do
   sh 'docker build -t mya . && docker run mya bundle exec rake spec'
 end
 
-task default: :spec
+file 'build/lib.ll' => 'src/lib.c' do
+  mkdir_p 'build'
+  sh 'clang -o build/lib.ll -S -emit-llvm src/lib.c'
+end

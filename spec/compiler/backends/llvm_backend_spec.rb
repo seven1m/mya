@@ -157,8 +157,7 @@ describe Compiler::Backends::LLVMBackend do
     instructions = Compiler.new(code).compile
     Compiler::Backends::LLVMBackend.new(instructions).dump_ir_to_file(temp.path)
     result = `lli #{temp.path} 2>&1`
-    # TODO: fix the `p` method so it outputs to stdout and stop using the return value. :-)
-    expect($?.exitstatus).must_equal(55)
+    expect(result).must_equal("55\n")
   ensure
     File.unlink(temp.path)
   end

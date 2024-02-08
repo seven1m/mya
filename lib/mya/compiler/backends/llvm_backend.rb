@@ -1,9 +1,12 @@
 require 'llvm/core'
 require 'llvm/execution_engine'
+require 'llvm/linker'
 
 class Compiler
   module Backends
     class LLVMBackend
+      LIB_PATH = File.expand_path('../../../../build/lib.ll', __dir__)
+
       def initialize(instructions, dump: false)
         @instructions = instructions
         @stack = []
@@ -12,6 +15,7 @@ class Compiler
         @if_depth = 0
         @methods = {}
         @dump = dump
+        @lib = LLVM::Module.parse_ir(LIB_PATH)
       end
 
       attr_reader :instructions
@@ -34,14 +38,7 @@ class Compiler
         '*': ->(builder, lhs, rhs) { builder.mul(lhs, rhs) },
         '/': ->(builder, lhs, rhs) { builder.sdiv(lhs, rhs) },
         '==': ->(builder, lhs, rhs) { builder.icmp(:eq, lhs, rhs) },
-        'p': ->(builder, arg) { arg } # FIXME
-            #printf_type = LLVM::Type.function([LLVM::Int8Ptr], LLVM::Int32, varargs: true)
-            #printf = @module.functions.add('printf', [LLVM::Int] , LLVM::Int )
-            #printf.linkage = :external
-            #printf = @module.external_function('printf', printf_type)
-            #format_str = builder.create_global_string_pointer("%d\n")
-            #args = [format_str,  arg.to_i]
-            #builder.call(printf, args)
+        'p': ->(builder, arg) { compile_p(builder, arg) },
       }.freeze
 
       def execute(fn)
@@ -61,6 +58,7 @@ class Compiler
         @entry = @module.functions.add('main', [], llvm_type(@return_type))
         @index = 0
         build_function(@entry)
+        @lib.link_into(@module)
         @module.dump if @dump
         raise 'Bad code generated' unless @module.valid?
       end
@@ -198,6 +196,19 @@ class Compiler
           value.to_ptr.read_pointer.read_string
           #value.to_ptr.read_string
         end
+      end
+
+      def compile_p(builder, arg)
+        case arg.type
+        when LLVM::IntType
+          builder.call(fn_p_int, arg)
+        else
+          raise "Unhandled type: #{arg.class}"
+        end
+      end
+
+      def fn_p_int
+        @fn_p_int ||= @module.functions.add('p_int', [LLVM::Int32], LLVM::Int32)
       end
     end
   end
