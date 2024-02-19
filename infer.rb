@@ -143,14 +143,13 @@ class TypeChecker
       unify_type(type_of_then, type_of_else)
       type_of_then
     when Lambda
-      parameter_types = []
       body_env = env.dup
       body_non_generic_vars = non_generic_vars.dup
-      exp.parameters.each do |parameter|
+      parameter_types = exp.parameters.map do |parameter|
         type_of_parameter = TypeVariable.new(self)
-        parameter_types << type_of_parameter
         body_env.merge!(parameter => type_of_parameter)
         body_non_generic_vars << type_of_parameter
+        type_of_parameter
       end
       type_of_body = analyze_exp(exp.body, body_env, body_non_generic_vars)
       LambdaType.new(*parameter_types, type_of_body)
@@ -179,8 +178,6 @@ class TypeChecker
     end
   end
 
-  # (p. 19) The first pass AnalyzeRecDeclBind simply creates a new set of
-  # non-generic type variables and associates them with identifiers.
   def analyze_rec_decl_bind(decl, env, non_generic_vars)
     case decl
     when Def
@@ -195,8 +192,6 @@ class TypeChecker
     end
   end
 
-  # (p. 19) The second pass AnalyzeRecDecl analyzes the declarations and makes
-  # calls to UnifyType to ensure the recursive type constraints.
   def analyze_rec_decl(decl, env, non_generic_vars)
     case decl
     when Def
@@ -212,15 +207,12 @@ class TypeChecker
     end
   end
 
-  # Analogous to EnvMod.Retrieve
   def retrieve_type(name, env, non_generic_vars)
     return unless (exp = env[name])
 
     fresh_type(exp, non_generic_vars)
   end
 
-  # (p. 19) FreshType makes a copy of a type expression, duplicating the generic variables
-  # and sharing the non-generic ones.
   def fresh_type(type_exp, non_generic_vars, env = {})
     type_exp = prune(type_exp)
     case type_exp
@@ -237,10 +229,6 @@ class TypeChecker
     end
   end
 
-  # (p. 19) The function Prune is used whenever a type expression has to be inspected: it will always
-  # return a type expression which is either an uninstantiated type variable or a type operator; i.e. it
-  # will skip instantiated variables, and will actually prune them from expressions to remove long
-  # chains of instantiated variables.
   def prune(type_exp)
     case type_exp
     when TypeVariable
@@ -259,7 +247,6 @@ class TypeChecker
     end
   end
 
-  # (p. 19) The function OccursInType checks whether a type variable occurs in a type expression.
   def occurs_in_type?(type_var, type_exp)
     type_exp = prune(type_exp)
     case type_exp
@@ -291,7 +278,7 @@ class TypeChecker
       when TypeVariable
         unify_type(b, a)
       when TypeOperator
-        if a.name == b.name
+        if a.name == b.name && a.types.size == b.types.size
           unify_args(a.types, b.types)
         else
           raise TypeClash, "#{a} cannot unify with #{b}"
@@ -306,10 +293,6 @@ class TypeChecker
     end
   end
 
-  # (p. 7) In general, the type of an expression is determined by a set of type combination rules for the
-  # language constructs, and by the types of the primitive operators. The initial type environment
-  # could contain the following primitives for booleans, integers, pairs and lists (where → is the
-  # function type operator, × is cartesian product, and list is the list operator):
   def build_initial_env
     pair_first = TypeVariable.new(self)
     pair_second = TypeVariable.new(self)
@@ -459,12 +442,40 @@ if $0 == __FILE__
         expect(analyze(exp).to_s).must_equal '(int × int)'
       end
 
+      it 'can pass no arguments to a lambda' do
+        exp = Block.new(
+                Def.new('fn', Lambda.new([], Identifier.new('1'))),
+                Apply.new(Identifier.new('fn')))
+        expect(analyze(exp).to_s).must_equal 'int'
+
+        exp = Apply.new(Identifier.new('pair2'), Identifier.new('1'), Identifier.new('true'))
+        expect(analyze(exp).to_s).must_equal '(int × bool)'
+      end
+
       it 'can pass more than one argument to a lambda' do
         exp = Apply.new(Identifier.new('pair2'), Identifier.new('1'), Identifier.new('2'))
         expect(analyze(exp).to_s).must_equal '(int × int)'
 
         exp = Apply.new(Identifier.new('pair2'), Identifier.new('1'), Identifier.new('true'))
         expect(analyze(exp).to_s).must_equal '(int × bool)'
+
+        exp = Block.new(
+                Def.new('fn', Lambda.new(['a', 'b'],
+                  Apply.new(
+                    Apply.new(Identifier.new('pair'), Identifier.new('b')),
+                    Identifier.new('a')))),
+                Apply.new(Identifier.new('fn'), Identifier.new('1'), Identifier.new('true')))
+        expect(analyze(exp).to_s).must_equal '(bool × int)'
+      end
+
+      it 'raises an error if the number of arguments does not match' do
+        exp = Apply.new(Identifier.new('pair2'), Identifier.new('1'))
+        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
+        expect(err.message).must_equal '([a, b] -> (a × b)) cannot unify with ([int] -> c)'
+
+        exp = Apply.new(Identifier.new('pair2'), Identifier.new('1'), Identifier.new('2'), Identifier.new('3'))
+        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
+        expect(err.message).must_equal '([a, b] -> (a × b)) cannot unify with ([int, int, int] -> c)'
       end
 
       it 'raises an error on type clash' do
