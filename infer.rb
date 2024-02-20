@@ -52,6 +52,18 @@ class Block
   attr_reader :exprs
 end
 
+class Ary
+  def initialize(*members)
+    @members = members
+  end
+
+  attr_reader :members
+
+  def to_s
+    "(ary #{members.join(', ')})"
+  end
+end
+
 class TypeVariable
   def initialize(type_checker)
     @type_checker = type_checker
@@ -92,11 +104,21 @@ class FunctionType < TypeOperator
   def to_s
     arg_types = types[0...-1]
     return_type = types.last
-    return "([#{arg_types.join(', ')}] -> #{return_type})"
+    "([#{arg_types.join(', ')}] -> #{return_type})"
   end
 
   def inspect
     "#<FunctionType #{types.join(', ')}>"
+  end
+end
+
+class AryType < TypeOperator
+  def initialize(type)
+    super('array', [type])
+  end
+
+  def to_s
+    "(#{types[0]} array)"
   end
 end
 
@@ -177,6 +199,14 @@ class TypeChecker
       env[exp.binder] = new_type_var
       non_generic_vars << new_type_var
       env[exp.binder] = analyze_exp(exp.def, env, non_generic_vars)
+    when Ary
+      exp.members.each_cons(2) do |a, b|
+        unify_type(
+          analyze_exp(a, env, non_generic_vars),
+          analyze_exp(b, env, non_generic_vars)
+        )
+      end
+      AryType.new(analyze_exp(exp.members.first, env, non_generic_vars))
     else
       raise "unknown expression: #{exp.inspect}"
     end
@@ -272,6 +302,8 @@ class TypeChecker
     list_type = TypeVariable.new(self)
     list = TypeOperator.new('list', [list_type])
     list_pair_type = TypeOperator.new('×', [list_type, list])
+    array_type = TypeVariable.new(self)
+    array = AryType.new(array_type)
     {
       'true' => BoolType,
       'false' => BoolType,
@@ -288,6 +320,7 @@ class TypeChecker
       'head' => FunctionType.new(list, list_type),
       'tail' => FunctionType.new(list, list),
       'null?' => FunctionType.new(list, BoolType),
+      'nth' => FunctionType.new(array, IntType, array_type)
     }
   end
 end
@@ -437,6 +470,26 @@ if $0 == __FILE__
                     Identifier.new('a')))),
                 Call.new(Identifier.new('fn'), Identifier.new('1'), Identifier.new('true')))
         expect(analyze(exp).to_s).must_equal '(bool × int)'
+      end
+
+      it 'can type check an array with members' do
+        ary = Ary.new(Identifier.new('1'), Identifier.new('2'))
+        expect(analyze(ary).to_s).must_equal '(int array)'
+
+        nth = Call.new(Identifier.new('nth'), ary, Identifier.new('0'))
+        expect(analyze(nth).to_s).must_equal 'int'
+
+        ary = Ary.new(Identifier.new('false'), Identifier.new('true'))
+        expect(analyze(ary).to_s).must_equal '(bool array)'
+
+        nth = Call.new(Identifier.new('nth'), ary, Identifier.new('0'))
+        expect(analyze(nth).to_s).must_equal 'bool'
+      end
+
+      it 'raises an error if array members do not match' do
+        exp = Ary.new(Identifier.new('1'), Identifier.new('true'))
+        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
+        expect(err.message).must_equal 'int cannot unify with bool'
       end
 
       it 'raises an error if the number of arguments does not match' do
