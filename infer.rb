@@ -308,30 +308,14 @@ class TypeChecker
   end
 
   def build_initial_env
-    pair_first = TypeVariable.new(self)
-    pair_second = TypeVariable.new(self)
-    pair_type = TypeOperator.new('×', [pair_first, pair_second])
-    list_type = TypeVariable.new(self)
-    list = TypeOperator.new('list', [list_type])
-    list_pair_type = TypeOperator.new('×', [list_type, list])
     array_type = TypeVariable.new(self)
     array = AryType.new(array_type)
     {
       'true' => BoolType,
       'false' => BoolType,
-      'succ' => FunctionType.new(IntType, IntType),
-      'pred' => FunctionType.new(IntType, IntType),
       'zero?' => FunctionType.new(IntType, BoolType),
       'times' => FunctionType.new(IntType, IntType, IntType),
       'minus' => FunctionType.new(IntType, IntType, IntType),
-      'pair' => FunctionType.new(pair_first, pair_second, pair_type),
-      'fst' => FunctionType.new(pair_type, pair_first), # car
-      'snd' => FunctionType.new(pair_type, pair_second), # cdr
-      'nil' => list,
-      'cons' => FunctionType.new(list_pair_type, list),
-      'head' => FunctionType.new(list, list_type),
-      'tail' => FunctionType.new(list, list),
-      'null?' => FunctionType.new(list, BoolType),
       'nth' => FunctionType.new(array, IntType, array_type),
       'push' => FunctionType.new(array, array_type, array_type),
     }
@@ -389,6 +373,7 @@ if $0 == __FILE__
         exp = Block.new(
           Var.new('g',
             Function.new('f', Identifier.new('5'))),
+
           Call.new(Identifier.new('g'), Identifier.new('g')))
         expect(analyze(exp).to_s).must_equal 'int'
 
