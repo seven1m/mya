@@ -8,6 +8,8 @@
 # The version here is modified to work with the semantics of my
 # Ruby-like compiled language Mya.
 
+require 'bundler/setup'
+require 'minitest/focus'
 require 'set'
 
 Cond = Struct.new(:test, :if_true, :if_false)
@@ -206,7 +208,13 @@ class TypeChecker
           analyze_exp(b, env, non_generic_vars)
         )
       end
-      AryType.new(analyze_exp(exp.members.first, env, non_generic_vars))
+      member_type = if exp.members.any?
+        analyze_exp(exp.members.first, env, non_generic_vars)
+      else
+        TypeVariable.new(self)
+      end
+      non_generic_vars << member_type
+      AryType.new(member_type)
     else
       raise "unknown expression: #{exp.inspect}"
     end
@@ -285,7 +293,11 @@ class TypeChecker
         else
           raise TypeClash, "#{a} cannot unify with #{b}"
         end
+      else
+        raise "Unknown type: #{b.inspect}"
       end
+    else
+      raise "Unknown type: #{a.inspect}"
     end
   end
 
@@ -320,7 +332,8 @@ class TypeChecker
       'head' => FunctionType.new(list, list_type),
       'tail' => FunctionType.new(list, list),
       'null?' => FunctionType.new(list, BoolType),
-      'nth' => FunctionType.new(array, IntType, array_type)
+      'nth' => FunctionType.new(array, IntType, array_type),
+      'push' => FunctionType.new(array, array_type, array_type),
     }
   end
 end
@@ -367,13 +380,11 @@ if $0 == __FILE__
 
         exp = Function.new('g',
           Block.new(
-            Var.new('f',
-              Function.new('x', Identifier.new('g'))),
-            Call.new(
-              Identifier.new('pair'),
-                Call.new(Identifier.new('f'), Identifier.new('3')),
-                Call.new(Identifier.new('f'), Identifier.new('true')))))
-        expect(analyze(exp).to_s).must_equal '([a] -> (a × a))'
+            Var.new('f', Function.new('x', Identifier.new('g'))),
+            Ary.new(
+              Call.new(Identifier.new('f'), Identifier.new('3')),
+              Call.new(Identifier.new('f'), Identifier.new('true')))))
+        expect(analyze(exp).to_s).must_equal '([a] -> (a array))'
 
         exp = Block.new(
           Var.new('g',
@@ -381,8 +392,8 @@ if $0 == __FILE__
           Call.new(Identifier.new('g'), Identifier.new('g')))
         expect(analyze(exp).to_s).must_equal 'int'
 
-        pair = Call.new(
-          Identifier.new('pair'),
+        exp = Block.new(
+          Var.new('f', Function.new('x', Identifier.new('x'))),
           Call.new(
             Identifier.new('f'),
             Identifier.new('4')
@@ -391,10 +402,7 @@ if $0 == __FILE__
             Identifier.new('f'),
             Identifier.new('true')
           ))
-        exp = Block.new(
-          Var.new('f', Function.new('x', Identifier.new('x'))),
-          pair)
-        expect(analyze(exp).to_s).must_equal '(int × bool)'
+        expect(analyze(exp).to_s).must_equal 'bool'
 
         # def factorial(n)
         #   if n.zero?
@@ -421,16 +429,6 @@ if $0 == __FILE__
           Call.new(Identifier.new('factorial'), Identifier.new('5')))
         expect(analyze(exp).to_s).must_equal 'int'
 
-        # (list 1 2)
-        exp = Call.new(Identifier.new('cons'),
-                Call.new(Identifier.new('pair'),
-                  Identifier.new('1'),
-                  Call.new(Identifier.new('cons'),
-                    Call.new(Identifier.new('pair'),
-                      Identifier.new('2'),
-                      Identifier.new('nil')))))
-        expect(analyze(exp).to_s).must_equal 'list int'
-
         exp = Block.new(
                 Var.new('x', Identifier.new('2')),
                 Var.new('fn', Function.new('n',
@@ -438,11 +436,10 @@ if $0 == __FILE__
                     Identifier.new('times'),
                     Identifier.new('n'),
                     Identifier.new('x')))),
-                Call.new(
-                  Identifier.new('pair'),
+                Ary.new(
                   Identifier.new('x'),
                   Call.new(Identifier.new('fn'), Identifier.new('3'))))
-        expect(analyze(exp).to_s).must_equal '(int × int)'
+        expect(analyze(exp).to_s).must_equal '(int array)'
       end
 
       it 'can pass no arguments to a lambda' do
@@ -450,26 +447,34 @@ if $0 == __FILE__
                 Var.new('fn', Function.new([], Identifier.new('1'))),
                 Call.new(Identifier.new('fn')))
         expect(analyze(exp).to_s).must_equal 'int'
-
-        exp = Call.new(Identifier.new('pair'), Identifier.new('1'), Identifier.new('true'))
-        expect(analyze(exp).to_s).must_equal '(int × bool)'
       end
 
       it 'can pass more than one argument to a lambda' do
-        exp = Call.new(Identifier.new('pair'), Identifier.new('1'), Identifier.new('2'))
-        expect(analyze(exp).to_s).must_equal '(int × int)'
-
-        exp = Call.new(Identifier.new('pair'), Identifier.new('1'), Identifier.new('true'))
-        expect(analyze(exp).to_s).must_equal '(int × bool)'
-
         exp = Block.new(
                 Var.new('fn', Function.new(['a', 'b'],
-                  Call.new(
-                    Identifier.new('pair'),
-                    Identifier.new('b'),
-                    Identifier.new('a')))),
-                Call.new(Identifier.new('fn'), Identifier.new('1'), Identifier.new('true')))
-        expect(analyze(exp).to_s).must_equal '(bool × int)'
+                  Ary.new(Identifier.new('a'), Identifier.new('b')))),
+              Call.new(Identifier.new('fn'), Identifier.new('1'), Identifier.new('2')))
+        expect(analyze(exp).to_s).must_equal '(int array)'
+      end
+
+      it 'raises an error if the number of arguments does not match' do
+        fn = Var.new('fn', Function.new(['a', 'b'],
+               Ary.new(Identifier.new('a'), Identifier.new('b'))))
+
+        exp = Block.new(
+                fn,
+                Call.new(Identifier.new('fn'), Identifier.new('1')))
+        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
+        expect(err.message).must_equal '([a, a] -> (a array)) cannot unify with ([int] -> b)'
+
+        exp = Block.new(
+                fn,
+                Call.new(Identifier.new('fn'),
+                  Identifier.new('1'),
+                  Identifier.new('2'),
+                  Identifier.new('3')))
+        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
+        expect(err.message).must_equal '([a, a] -> (a array)) cannot unify with ([int, int, int] -> b)'
       end
 
       it 'can type check an array with members' do
@@ -486,48 +491,43 @@ if $0 == __FILE__
         expect(analyze(nth).to_s).must_equal 'bool'
       end
 
+      it 'can type check an array without any members initially' do
+        exp = Block.new(
+                Var.new('ary', Ary.new),
+                Call.new(Identifier.new('push'), Identifier.new('ary'), Identifier.new('1')),
+                Identifier.new('ary'))
+        expect(analyze(exp).to_s).must_equal '(int array)'
+
+        exp = Block.new(
+                Var.new('ary', Ary.new),
+                Call.new(Identifier.new('push'), Identifier.new('ary'), Identifier.new('true')),
+                Identifier.new('ary'))
+        expect(analyze(exp).to_s).must_equal '(bool array)'
+      end
+
       it 'raises an error if array members do not match' do
         exp = Ary.new(Identifier.new('1'), Identifier.new('true'))
         err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
         expect(err.message).must_equal 'int cannot unify with bool'
-      end
 
-      it 'raises an error if the number of arguments does not match' do
-        exp = Call.new(Identifier.new('pair'), Identifier.new('1'))
-        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
-        expect(err.message).must_equal '([a, b] -> (a × b)) cannot unify with ([int] -> c)'
+        exp = Block.new(
+                Var.new('ary', Ary.new(Identifier.new('true'))),
+                Call.new(Identifier.new('push'), Identifier.new('ary'), Identifier.new('1')),
+                Identifier.new('ary'))
+        err = expect { analyze(exp).to_s }.must_raise TypeChecker::TypeClash
+        expect(err.message).must_equal 'bool cannot unify with int'
 
-        exp = Call.new(Identifier.new('pair'), Identifier.new('1'), Identifier.new('2'), Identifier.new('3'))
-        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
-        expect(err.message).must_equal '([a, b] -> (a × b)) cannot unify with ([int, int, int] -> c)'
-      end
-
-      it 'raises an error on type clash' do
-        exp = Function.new('x',
-          Call.new(
-            Identifier.new('pair'),
-            Call.new(Identifier.new('x'), Identifier.new('3')),
-            Call.new(Identifier.new('x'), Identifier.new('true'))))
-        err = expect { analyze(exp) }.must_raise TypeChecker::TypeClash
-        expect(err.message).must_equal 'int cannot unify with bool'
-      end
-
-      it 'raises an error on type clash with a list' do
-        list = Call.new(
-                Identifier.new('cons'),
-                Call.new(Identifier.new('pair'),
-                  Identifier.new('true'),
-                  Call.new(Identifier.new('cons'),
-                    Call.new(Identifier.new('pair'), Identifier.new('2'), Identifier.new('nil')))))
-        err = expect { analyze(list) }.must_raise TypeChecker::TypeClash
+        exp = Block.new(
+                Var.new('ary', Ary.new),
+                Call.new(Identifier.new('push'), Identifier.new('ary'), Identifier.new('true')),
+                Call.new(Identifier.new('push'), Identifier.new('ary'), Identifier.new('1')),
+                Identifier.new('ary'))
+        err = expect { analyze(exp).to_s }.must_raise TypeChecker::TypeClash
         expect(err.message).must_equal 'bool cannot unify with int'
       end
 
       it 'raises an error when the symbol is undefined' do
-        exp = Call.new(
-          Identifier.new('pair'),
-          Call.new(Identifier.new('f'), Identifier.new('4')),
-          Call.new(Identifier.new('f'), Identifier.new('true')))
+        exp = Call.new(Identifier.new('f'), Identifier.new('4'))
         err = expect { analyze(exp) }.must_raise TypeChecker::UndefinedSymbol
         expect(err.message).must_equal 'undefined symbol f'
       end
