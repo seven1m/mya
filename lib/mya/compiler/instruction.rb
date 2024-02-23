@@ -43,8 +43,8 @@ class Compiler
       end
     end
 
-    def inspect
-      "<Instruction #{@legacy_name}, arg: #{@arg.inspect}>"
+    def inspect(indent = 0, index = nil)
+      "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} #{@legacy_name}, arg: #{@arg.inspect}>"
     end
   end
 
@@ -115,6 +115,28 @@ class Compiler
     end
 
     attr_accessor :if_true, :if_false
+
+    def to_h
+      super.merge(
+        if_true: if_true.map(&:to_h),
+        if_false: if_false.map(&:to_h)
+      )
+    end
+
+    def inspect(indent = 0, index = nil)
+      s = "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} #{@legacy_name}, arg: #{@arg.inspect}>"
+      s << "\n#{' ' * indent}  if_true: ["
+      if_true.each_with_index do |instruction, index|
+        s << "\n#{instruction.inspect(indent + 4, index)}"
+      end
+      s << "\n#{' ' * indent}  ]"
+      s << "\n#{' ' * indent}  if_false: ["
+      if_false.each_with_index do |instruction, index|
+        s << "\n#{instruction.inspect(indent + 4, index)}"
+      end
+      s << "\n#{' ' * indent}  ]"
+      s
+    end
   end
 
   class DefInstruction < Instruction
@@ -122,7 +144,25 @@ class Compiler
       super(:def, arg: name, extra_arg: param_size, line:)
     end
 
+    attr_accessor :body
+
     def name = arg
     def param_size = extra_arg
+
+    def to_h
+      super.merge(
+        body: body.map(&:to_h)
+      )
+    end
+
+    def inspect(indent = 0, index = nil)
+      s = "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} #{@legacy_name}, arg: #{@arg.inspect}>"
+      s << "\n#{' ' * indent}  body: ["
+      body.each_with_index do |instruction, index|
+        s << "\n#{instruction.inspect(indent + 4, index)}"
+      end
+      s << "\n#{' ' * indent}  ]"
+      s
+    end
   end
 end

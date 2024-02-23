@@ -58,12 +58,20 @@ describe Compiler do
       bar
     CODE
     expect(compile(code)).must_equal [
-      { type: :str, instruction: [:def, :foo, 0] },
-      { type: :str, instruction: [:push_str, 'foo'] },
-      { type: nil, instruction: %i[end_def foo] },
-      { type: :int, instruction: [:def, :bar, 0] },
-      { type: :int, instruction: [:push_int, 1] },
-      { type: nil, instruction: %i[end_def bar] },
+      {
+        type: :str,
+        instruction: [:def, :foo, 0],
+        body: [
+          { type: :str, instruction: [:push_str, 'foo'] },
+        ]
+      },
+      {
+        type: :int,
+        instruction: [:def, :bar, 0],
+        body: [
+          { type: :int, instruction: [:push_int, 1] },
+        ]
+      },
       { type: :str, instruction: [:call, :foo, 0] },
       { type: :int, instruction: [:call, :bar, 0] }
     ]
@@ -84,19 +92,27 @@ describe Compiler do
       bar(2)
     CODE
     expect(compile(code)).must_equal_with_diff [
-      { type: :int, instruction: [:def, :bar, 1] },
-      { type: :int, instruction: [:push_arg, 0] },
-      { type: :int, instruction: %i[set_var a] },
-      { type: :int, instruction: %i[push_var a] },
-      { type: nil, instruction: %i[end_def bar] },
+      {
+        type: :int,
+        instruction: [:def, :bar, 1],
+        body: [
+          { type: :int, instruction: [:push_arg, 0] },
+          { type: :int, instruction: %i[set_var a] },
+          { type: :int, instruction: %i[push_var a] },
+        ]
+      },
 
-      { type: :str, instruction: [:def, :foo, 2] },
-      { type: :str, instruction: [:push_arg, 0] },
-      { type: :str, instruction: %i[set_var a] },
-      { type: :int, instruction: [:push_arg, 1] },
-      { type: :int, instruction: %i[set_var b] },
-      { type: :str, instruction: %i[push_var a] },
-      { type: nil, instruction: %i[end_def foo] },
+      {
+        type: :str,
+        instruction: [:def, :foo, 2],
+        body: [
+          { type: :str, instruction: [:push_arg, 0] },
+          { type: :str, instruction: %i[set_var a] },
+          { type: :int, instruction: [:push_arg, 1] },
+          { type: :int, instruction: %i[set_var b] },
+          { type: :str, instruction: %i[push_var a] },
+        ]
+      },
 
       { type: :str, instruction: [:push_str, 'foo'] },
       { type: :int, instruction: [:push_int, 1] },
@@ -118,7 +134,7 @@ describe Compiler do
   end
 
   # NOTE: we don't support monomorphization (yet!)
-  it 'raises an error if the method arg can have more than one type' do
+  it 'raises an error if the method arg has more than one type' do
     code = <<~CODE
       def foo(a)
         a
@@ -158,11 +174,16 @@ describe Compiler do
     CODE
     expect(compile(code)).must_equal_with_diff [
       { type: :int, instruction: [:push_int, 1] },
-      { type: :int, instruction: [:if] },
-      { type: :int, instruction: [:push_int, 2] },
-      { type: nil, instruction: [:else] },
-      { type: :int, instruction: [:push_int, 3] },
-      { type: :int, instruction: [:end_if] }
+      {
+        type: :int,
+        instruction: [:if],
+        if_true: [
+          { type: :int, instruction: [:push_int, 2] },
+        ],
+        if_false: [
+          { type: :int, instruction: [:push_int, 3] },
+        ]
+      },
     ]
   end
 
@@ -181,33 +202,48 @@ describe Compiler do
   it 'compiles examples/fib.rb' do
     code = File.read(File.expand_path('../examples/fib.rb', __dir__))
     expect(compile(code)).must_equal_with_diff [
-      { type: :int, instruction: [:def, :fib, 1] },
-      { type: :int, instruction: [:push_arg, 0] },
-      { type: :int, instruction: %i[set_var n] },
-      { type: :int, instruction: %i[push_var n] },
-      { type: :int, instruction: [:push_int, 0] },
-      { type: :bool, instruction: [:call, :==, 2] },
-      { type: :int, instruction: [:if] },
-      { type: :int, instruction: [:push_int, 0] },
-      { type: nil, instruction: [:else] },
-      { type: :int, instruction: %i[push_var n] },
-      { type: :int, instruction: [:push_int, 1] },
-      { type: :bool, instruction: [:call, :==, 2] },
-      { type: :int, instruction: [:if] },
-      { type: :int, instruction: [:push_int, 1] },
-      { type: nil, instruction: [:else] },
-      { type: :int, instruction: %i[push_var n] },
-      { type: :int, instruction: [:push_int, 1] },
-      { type: :int, instruction: [:call, :-, 2] },
-      { type: :int, instruction: [:call, :fib, 1] },
-      { type: :int, instruction: %i[push_var n] },
-      { type: :int, instruction: [:push_int, 2] },
-      { type: :int, instruction: [:call, :-, 2] },
-      { type: :int, instruction: [:call, :fib, 1] },
-      { type: :int, instruction: [:call, :+, 2] },
-      { type: :int, instruction: [:end_if] },
-      { type: :int, instruction: [:end_if] },
-      { type: nil, instruction: %i[end_def fib] },
+      {
+        type: :int,
+        instruction: [:def, :fib, 1],
+        body: [
+          { type: :int, instruction: [:push_arg, 0] },
+          { type: :int, instruction: %i[set_var n] },
+          { type: :int, instruction: %i[push_var n] },
+          { type: :int, instruction: [:push_int, 0] },
+          { type: :bool, instruction: [:call, :==, 2] },
+          {
+            type: :int,
+            instruction: [:if],
+            if_true: [
+              { type: :int, instruction: [:push_int, 0] },
+            ],
+            if_false: [
+              { type: :int, instruction: %i[push_var n] },
+              { type: :int, instruction: [:push_int, 1] },
+              { type: :bool, instruction: [:call, :==, 2] },
+              {
+                type: :int,
+                instruction: [:if],
+                if_true: [
+                  { type: :int, instruction: [:push_int, 1] },
+                ],
+                if_false: [
+                  { type: :int, instruction: %i[push_var n] },
+                  { type: :int, instruction: [:push_int, 1] },
+                  { type: :int, instruction: [:call, :-, 2] },
+                  { type: :int, instruction: [:call, :fib, 1] },
+                  { type: :int, instruction: %i[push_var n] },
+                  { type: :int, instruction: [:push_int, 2] },
+                  { type: :int, instruction: [:call, :-, 2] },
+                  { type: :int, instruction: [:call, :fib, 1] },
+                  { type: :int, instruction: [:call, :+, 2] },
+                ]
+              },
+            ]
+          },
+        ]
+      },
+
       { type: :int, instruction: [:push_int, 10] },
       { type: :int, instruction: [:call, :fib, 1] },
       { type: :int, instruction: [:call, :puts, 1] }
