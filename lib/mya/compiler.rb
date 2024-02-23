@@ -29,42 +29,42 @@ class Compiler
     when Prism::ProgramNode
       transform(node.statements)
     when Prism::IntegerNode
-      instruction = Instruction.new(:push_int, arg: node.value, type: :int, line: node.location.start_line)
+      instruction = PushIntInstruction.new(node.value, line: node.location.start_line)
       @instructions << instruction
       instruction
     when Prism::StringNode
-      instruction = Instruction.new(:push_str, arg: node.unescaped, type: :str, line: node.location.start_line)
+      instruction = PushStrInstruction.new(node.unescaped, line: node.location.start_line)
       @instructions << instruction
       instruction
     when Prism::TrueNode
-      instruction = Instruction.new(:push_true, type: :bool, line: node.location.start_line)
+      instruction = PushTrueInstruction.new(line: node.location.start_line)
       @instructions << instruction
       instruction
     when Prism::FalseNode
-      instruction = Instruction.new(:push_false, type: :bool, line: node.location.start_line)
+      instruction = PushFalseInstruction.new(line: node.location.start_line)
       @instructions << instruction
       instruction
     when Prism::StatementsNode
       node.body.map { |n| transform(n) }.last
     when Prism::LocalVariableWriteNode
       value_instruction = transform(node.value)
-      instruction = Instruction.new(:set_var, arg: node.name, line: node.location.start_line)
+      instruction = SetVarInstruction.new(node.name, line: node.location.start_line)
       instruction.add_dependency(Dependency.new(instruction: value_instruction))
       set_var(node.name, instruction)
       @instructions << instruction
       instruction
     when Prism::LocalVariableReadNode
-      instruction = Instruction.new(:push_var, arg: node.name, line: node.location.start_line)
+      instruction = PushVarInstruction.new(node.name, line: node.location.start_line)
       instruction.add_dependency(VariableDependency.new(name: node.name, scope:))
       @instructions << instruction
       instruction
     when Prism::DefNode
       @scope_stack << { vars: {} }
       params = (node.parameters&.requireds || [])
-      instruction = Instruction.new(:def, arg: node.name, extra_arg: params.size, line: node.location.start_line)
+      instruction = DefInstruction.new(node.name, param_size: params.size, line: node.location.start_line)
       @instructions << instruction
       params.each_with_index do |arg, index|
-        i1 = Instruction.new(:push_arg, arg: index, line: node.location.start_line)
+        i1 = PushArgInstruction.new(index, line: node.location.start_line)
         i1.add_dependency(
           CallArgDependency.new(
             method_name: node.name,
@@ -74,7 +74,7 @@ class Compiler
           )
         )
         @instructions << i1
-        i2 = Instruction.new(:set_var, arg: arg.name, line: node.location.start_line)
+        i2 = SetVarInstruction.new(arg.name, line: node.location.start_line)
         i2.add_dependency(i1)
         @instructions << i2
         set_var(arg.name, i2)
@@ -92,13 +92,13 @@ class Compiler
         transform(arg)
       end
       @calls[node.name] << { args: arg_instructions }
-      instruction = Instruction.new(:call, arg: node.name, extra_arg: args.size, line: node.location.start_line)
+      instruction = CallInstruction.new(node.name, arg_size: args.size, line: node.location.start_line)
       instruction.add_dependency(MethodDependency.new(name: node.name, methods: @methods))
       @instructions << instruction
       instruction
     when Prism::IfNode
       transform(node.predicate)
-      instruction = Instruction.new(:if, line: node.location.start_line)
+      instruction = IfInstruction.new(line: node.location.start_line)
       @instructions << instruction
       true_instruction = transform(node.statements)
       @instructions << Instruction.new(:else, line: node.consequent.location.start_line)

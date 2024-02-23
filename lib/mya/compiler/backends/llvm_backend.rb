@@ -84,35 +84,35 @@ class Compiler
           instruction = @instructions[@index]
           build(instruction, function, builder)
           @index += 1
-          break if stop_at.include?(@instructions[@index]&.name)
+          break if stop_at.include?(@instructions[@index]&.legacy_name)
         end
         return_value = @stack.pop
         yield return_value
       end
 
       def build(instruction, function, builder)
-        case instruction.name
-        when :push_int
+        case instruction
+        when PushIntInstruction
           @stack << LLVM::Int(instruction.arg)
-        when :push_str
+        when PushStrInstruction
           # FIXME: don't always want a global string here probably
           str = @module.globals.add(LLVM::ConstantArray.string(instruction.arg), 'str') do |var|
             var.initializer = LLVM::ConstantArray.string(instruction.arg)
           end
           @stack << str
-        when :push_true
+        when PushTrueInstruction
           @stack << LLVM::TRUE
-        when :push_false
+        when PushFalseInstruction
           @stack << LLVM::FALSE
-        when :set_var
+        when SetVarInstruction
           value = @stack.pop
           variable = builder.alloca(value.type, "var_#{instruction.arg}")
           builder.store(value, variable)
           vars[instruction.arg] = variable
-        when :push_var
+        when PushVarInstruction
           variable = vars.fetch(instruction.arg)
           @stack << builder.load(variable)
-        when :def
+        when DefInstruction
           @index += 1
           name = instruction.arg
           arg_types = (0...instruction.extra_arg).map do |i|
@@ -121,7 +121,7 @@ class Compiler
           return_type = llvm_type(instruction.type!)
           @methods[name] = fn  = @module.functions.add(name, arg_types, return_type)
           build_function(fn)
-        when :call
+        when CallInstruction
           args = @stack.pop(instruction.extra_arg)
           if (built_in_method = BUILT_IN_METHODS[instruction.arg])
             @stack << instance_exec(builder, *args, &built_in_method)
@@ -130,17 +130,17 @@ class Compiler
             function = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
             @stack << builder.call(function, *args)
           end
-        when :push_arg
+        when PushArgInstruction
           function = @scope_stack.last.fetch(:function)
           @stack << function.params[instruction.arg]
-        when :if
+        when IfInstruction
           result = builder.alloca(llvm_type(instruction.type!), "if_line_#{instruction.line}")
           then_block = function.basic_blocks.append
           else_block = function.basic_blocks.append
           result_block = function.basic_blocks.append
           condition = @stack.pop
           builder.cond(condition, then_block, else_block)
-          raise 'bad if' if @index >= @instructions.size || @instructions[@index].name != :if
+          raise 'bad if' if @index >= @instructions.size || @instructions[@index].legacy_name != :if
           @index += 1
           then_block.build do |then_builder|
             build_instructions(function, then_builder, stop_at: [:else]) do |value|
@@ -148,7 +148,7 @@ class Compiler
               then_builder.br(result_block)
             end
           end
-          raise 'bad else' if @index >= @instructions.size || @instructions[@index].name != :else
+          raise 'bad else' if @index >= @instructions.size || @instructions[@index].legacy_name != :else
           @index += 1
           else_block.build do |else_builder|
             build_instructions(function, else_builder, stop_at: [:end_if]) do |value|
@@ -158,8 +158,6 @@ class Compiler
           end
           builder.position_at_end(result_block)
           @stack << builder.load(result)
-        when :end_def, :end_if, :else
-          raise 'should not reach here'
         else
           raise "Unknown instruction: #{instruction.inspect}"
         end

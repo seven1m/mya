@@ -33,24 +33,21 @@ class VM
   }.freeze
 
   def execute(instruction)
-    case instruction.name
-    when :push_int, :push_str
+    case instruction
+    when Compiler::PushIntInstruction, Compiler::PushStrInstruction
       @stack << instruction.arg
-    when :push_true
+    when Compiler::PushTrueInstruction
       @stack << true
-    when :push_false
+    when Compiler::PushFalseInstruction
       @stack << false
-    when :set_var
+    when Compiler::SetVarInstruction
       vars[instruction.arg] = @stack.pop
-    when :push_var
+    when Compiler::PushVarInstruction
       @stack << vars.fetch(instruction.arg)
-    when :def
+    when Compiler::DefInstruction
       @methods[instruction.arg] = @index + 1
-      @index += 1 until @instructions[@index].name == :end_def
-    when :end_def
-      @scope_stack.pop
-      @index = @call_stack.pop.fetch(:return_index)
-    when :call
+      @index += 1 until @instructions[@index].legacy_name == :end_def
+    when Compiler::CallInstruction
       args = @stack.pop(instruction.extra_arg)
       if BUILT_IN_METHODS.key?(instruction.arg)
         @stack << if (built_in_method = BUILT_IN_METHODS[instruction.arg])
@@ -63,9 +60,9 @@ class VM
         @scope_stack << { vars: {} }
         @index = @methods.fetch(instruction.arg) - 1
       end
-    when :push_arg
+    when Compiler::PushArgInstruction
       @stack << @call_stack.last.fetch(:args)[instruction.arg]
-    when :if
+    when Compiler::IfInstruction
       condition = @stack.pop
       if condition
         :noop # just execute next expression
@@ -73,10 +70,18 @@ class VM
         @index += 1
         skip_to_next_instruction_by_name(:else)
       end
-    when :else
-      skip_to_next_instruction_by_name(:end_if)
-    when :end_if
-      :noop
+    when Compiler::Instruction
+      case instruction.legacy_name
+      when :end_def
+        @scope_stack.pop
+        @index = @call_stack.pop.fetch(:return_index)
+      when :else
+        skip_to_next_instruction_by_name(:end_if)
+      when :end_if
+        :noop
+      else
+        raise "Unknown instruction: #{instruction.inspect}"
+      end
     else
       raise "Unknown instruction: #{instruction.inspect}"
     end
@@ -84,8 +89,8 @@ class VM
 
   def skip_to_next_instruction_by_name(name)
     start_if_depth = @if_depth
-    until @instructions[@index].name == name && @if_depth == start_if_depth
-      case @instructions[@index].name
+    until @instructions[@index].legacy_name == name && @if_depth == start_if_depth
+      case @instructions[@index].legacy_name
       when :if
         @if_depth += 1
       when :end_if
