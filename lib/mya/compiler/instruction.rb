@@ -12,10 +12,7 @@ class Compiler
     attr_reader :legacy_name, :arg, :extra_arg, :type, :line, :dependencies
 
     def to_h
-      {
-        type: type!,
-        instruction: [@legacy_name, @arg, @extra_arg].compact
-      }
+      raise NotImplementedError, __method__
     end
 
     def add_dependency(dependency)
@@ -54,6 +51,14 @@ class Compiler
     end
 
     def value = arg
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_int,
+        value:,
+      }
+    end
   end
 
   class PushStrInstruction < Instruction
@@ -62,17 +67,39 @@ class Compiler
     end
 
     def value = arg
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_str,
+        value:,
+      }
+    end
   end
 
   class PushTrueInstruction < Instruction
     def initialize(line:)
       super(:push_true, type: :bool, line:)
     end
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_true,
+      }
+    end
   end
 
   class PushFalseInstruction < Instruction
     def initialize(line:)
       super(:push_false, type: :bool, line:)
+    end
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_false,
+      }
     end
   end
 
@@ -82,6 +109,14 @@ class Compiler
     end
 
     def name = arg
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_var,
+        name:,
+      }
+    end
   end
 
   class SetVarInstruction < Instruction
@@ -90,6 +125,14 @@ class Compiler
     end
 
     def name = arg
+
+    def to_h
+      {
+        type: type!,
+        instruction: :set_var,
+        name:,
+      }
+    end
   end
 
   class PushArgInstruction < Instruction
@@ -98,6 +141,14 @@ class Compiler
     end
 
     def index = arg
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_arg,
+        index:,
+      }
+    end
   end
 
   class CallInstruction < Instruction
@@ -107,6 +158,15 @@ class Compiler
 
     def name = arg
     def arg_size = extra_arg
+
+    def to_h
+      {
+        type: type!,
+        instruction: :call,
+        name:,
+        arg_size:,
+      }
+    end
   end
 
   class IfInstruction < Instruction
@@ -117,10 +177,12 @@ class Compiler
     attr_accessor :if_true, :if_false
 
     def to_h
-      super.merge(
+      {
+        type: type!,
+        instruction: :if,
         if_true: if_true.map(&:to_h),
         if_false: if_false.map(&:to_h)
-      )
+      }
     end
 
     def inspect(indent = 0, index = nil)
@@ -150,9 +212,13 @@ class Compiler
     def param_size = extra_arg
 
     def to_h
-      super.merge(
+      {
+        type: type!,
+        instruction: :def,
+        name:,
+        param_size:,
         body: body.map(&:to_h)
-      )
+      }
     end
 
     def inspect(indent = 0, index = nil)
