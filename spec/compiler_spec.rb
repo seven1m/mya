@@ -63,6 +63,7 @@ describe Compiler do
         instruction: :def,
         name: :foo,
         param_size: 0,
+        params: [],
         body: [
           { type: :str, instruction: :push_str, value: 'foo' },
         ]
@@ -72,12 +73,23 @@ describe Compiler do
         instruction: :def,
         name: :bar,
         param_size: 0,
+        params: [],
         body: [
           { type: :int, instruction: :push_int, value: 1 },
         ]
       },
-      { type: :str, instruction: :call, name: :foo, arg_size: 0 },
-      { type: :int, instruction: :call, name: :bar, arg_size: 0 }
+      {
+        type: :str,
+        instruction: :call,
+        name: :foo,
+        arg_size: 0,
+      },
+      {
+        type: :int,
+        instruction: :call,
+        name: :bar,
+        arg_size: 0,
+      }
     ]
   end
 
@@ -101,6 +113,7 @@ describe Compiler do
         instruction: :def,
         name: :bar,
         param_size: 1,
+        params: [:a],
         body: [
           { type: :int, instruction: :push_arg, index: 0 },
           { type: :int, instruction: :set_var, name: :a },
@@ -113,6 +126,7 @@ describe Compiler do
         instruction: :def,
         name: :foo,
         param_size: 2,
+        params: [:a, :b],
         body: [
           { type: :str, instruction: :push_arg, index: 0 },
           { type: :str, instruction: :set_var, name: :a },
@@ -215,6 +229,7 @@ describe Compiler do
         instruction: :def,
         name: :fib,
         param_size: 1,
+        params: [:n],
         body: [
           { type: :int, instruction: :push_arg, index: 0 },
           { type: :int, instruction: :set_var, name: :n },

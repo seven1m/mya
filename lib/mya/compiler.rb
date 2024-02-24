@@ -66,21 +66,22 @@ class Compiler
       instruction = DefInstruction.new(node.name, param_size: params.size, line: node.location.start_line)
       instructions << instruction
       def_instructions = []
-      params.each_with_index do |arg, index|
+      params.each_with_index do |param, index|
         i1 = PushArgInstruction.new(index, line: node.location.start_line)
         i1.add_dependency(
           CallArgDependency.new(
             method_name: node.name,
             calls: @calls[node.name],
             arg_index: index,
-            arg_name: arg.name
+            arg_name: param.name
           )
         )
         def_instructions << i1
-        i2 = SetVarInstruction.new(arg.name, line: node.location.start_line)
+        i2 = SetVarInstruction.new(param.name, line: node.location.start_line)
         i2.add_dependency(i1)
         def_instructions << i2
-        set_var(arg.name, i2)
+        set_var(param.name, i2)
+        instruction.params << param.name
       end
       return_instruction = transform(node.body, def_instructions)
       instruction.body = def_instructions
@@ -136,7 +137,7 @@ class Compiler
     end.compact.uniq
     return unless unique_types.size > 1
 
-    raise TypeError, "Variable a was set with more than one type: #{unique_types.inspect}"
+    raise TypeError, "Variable #{name} was set with more than one type: #{unique_types.inspect}"
   end
 
   def set_method(name, instruction)
