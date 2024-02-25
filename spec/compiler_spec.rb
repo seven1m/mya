@@ -80,13 +80,13 @@ describe Compiler do
         type: :str,
         instruction: :call,
         name: :foo,
-        arg_size: 0,
+        arg_count: 0,
       },
       {
         type: :int,
         instruction: :call,
         name: :bar,
-        arg_size: 0,
+        arg_count: 0,
       }
     ]
   end
@@ -134,10 +134,10 @@ describe Compiler do
 
       { type: :str, instruction: :push_str, value: 'foo' },
       { type: :int, instruction: :push_int, value: 1 },
-      { type: :str, instruction: :call, name: :foo, arg_size: 2 },
+      { type: :str, instruction: :call, name: :foo, arg_count: 2 },
 
       { type: :int, instruction: :push_int, value: 2 },
-      { type: :int, instruction: :call, name: :bar, arg_size: 1 }
+      { type: :int, instruction: :call, name: :bar, arg_count: 1 }
     ]
   end
 
@@ -174,11 +174,11 @@ describe Compiler do
     expect(compile(code)).must_equal_with_diff [
       { type: :int, instruction: :push_int, value: 1 },
       { type: :int, instruction: :push_int, value: 2 },
-      { type: :int, instruction: :call, name: :+, arg_size: 2 },
+      { type: :int, instruction: :call, name: :+, arg_count: 2 },
 
       { type: :int, instruction: :push_int, value: 3 },
       { type: :int, instruction: :push_int, value: 4 },
-      { type: :bool, instruction: :call, name: :==, arg_size: 2 }
+      { type: :bool, instruction: :call, name: :==, arg_count: 2 }
     ]
   end
 
@@ -231,7 +231,7 @@ describe Compiler do
           { type: :int, instruction: :set_var, name: :n },
           { type: :int, instruction: :push_var, name: :n },
           { type: :int, instruction: :push_int, value: 0 },
-          { type: :bool, instruction: :call, name: :==, arg_size: 2 },
+          { type: :bool, instruction: :call, name: :==, arg_count: 2 },
           {
             type: :int,
             instruction: :if,
@@ -241,7 +241,7 @@ describe Compiler do
             if_false: [
               { type: :int, instruction: :push_var, name: :n },
               { type: :int, instruction: :push_int, value: 1 },
-              { type: :bool, instruction: :call, name: :==, arg_size: 2 },
+              { type: :bool, instruction: :call, name: :==, arg_count: 2 },
               {
                 type: :int,
                 instruction: :if,
@@ -251,13 +251,13 @@ describe Compiler do
                 if_false: [
                   { type: :int, instruction: :push_var, name: :n },
                   { type: :int, instruction: :push_int, value: 1 },
-                  { type: :int, instruction: :call, name: :-, arg_size: 2 },
-                  { type: :int, instruction: :call, name: :fib, arg_size: 1 },
+                  { type: :int, instruction: :call, name: :-, arg_count: 2 },
+                  { type: :int, instruction: :call, name: :fib, arg_count: 1 },
                   { type: :int, instruction: :push_var, name: :n },
                   { type: :int, instruction: :push_int, value: 2 },
-                  { type: :int, instruction: :call, name: :-, arg_size: 2 },
-                  { type: :int, instruction: :call, name: :fib, arg_size: 1 },
-                  { type: :int, instruction: :call, name: :+, arg_size: 2 },
+                  { type: :int, instruction: :call, name: :-, arg_count: 2 },
+                  { type: :int, instruction: :call, name: :fib, arg_count: 1 },
+                  { type: :int, instruction: :call, name: :+, arg_count: 2 },
                 ]
               },
             ]
@@ -266,8 +266,8 @@ describe Compiler do
       },
 
       { type: :int, instruction: :push_int, value: 10 },
-      { type: :int, instruction: :call, name: :fib, arg_size: 1 },
-      { type: :int, instruction: :call, name: :puts, arg_size: 1 }
+      { type: :int, instruction: :call, name: :fib, arg_count: 1 },
+      { type: :int, instruction: :call, name: :puts, arg_count: 1 }
     ]
   end
 
@@ -286,7 +286,7 @@ describe Compiler do
           { type: :int, instruction: :set_var, name: :result },
           { type: :int, instruction: :push_var, name: :n },
           { type: :int, instruction: :push_int, value: 0 },
-          { type: :bool, instruction: :call, name: :==, arg_size: 2 },
+          { type: :bool, instruction: :call, name: :==, arg_count: 2 },
           {
             type: :int,
             instruction: :if,
@@ -300,11 +300,11 @@ describe Compiler do
             if_false: [
               { type: :int, instruction: :push_var, name: :n },
               { type: :int, instruction: :push_int, value: 1 },
-              { type: :int, instruction: :call, name: :-, arg_size: 2 },
+              { type: :int, instruction: :call, name: :-, arg_count: 2 },
               { type: :int, instruction: :push_var, name: :result },
               { type: :int, instruction: :push_var, name: :n },
-              { type: :int, instruction: :call, name: :*, arg_size: 2 },
-              { type: :int, instruction: :call, name: :fact, arg_size: 2 }
+              { type: :int, instruction: :call, name: :*, arg_count: 2 },
+              { type: :int, instruction: :call, name: :fact, arg_count: 2 }
             ]
           }
         ]
@@ -312,8 +312,8 @@ describe Compiler do
 
       { type: :int, instruction: :push_int, value: 10 },
       { type: :int, instruction: :push_int, value: 1 },
-      { type: :int, instruction: :call, name: :fact, arg_size: 2 },
-      { type: :int, instruction: :call, name: :puts, arg_size: 1 },
+      { type: :int, instruction: :call, name: :fact, arg_count: 2 },
+      { type: :int, instruction: :call, name: :puts, arg_count: 1 },
     ]
   end
 end

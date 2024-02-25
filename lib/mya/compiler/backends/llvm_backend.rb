@@ -119,7 +119,7 @@ class Compiler
           @methods[name] = fn  = @module.functions.add(name, param_types, return_type)
           build_function(fn, instruction.body)
         when CallInstruction
-          args = @stack.pop(instruction.arg_size)
+          args = @stack.pop(instruction.arg_count)
           if (built_in_method = BUILT_IN_METHODS[instruction.name])
             @stack << instance_exec(builder, *args, &built_in_method)
           else

@@ -58,7 +58,7 @@ class VM
     when Compiler::DefInstruction
       @methods[instruction.arg] = instruction
     when Compiler::CallInstruction
-      new_args = @stack.pop(instruction.arg_size)
+      new_args = @stack.pop(instruction.arg_count)
       if BUILT_IN_METHODS.key?(instruction.arg)
         @stack << if (built_in_method = BUILT_IN_METHODS[instruction.arg])
                     built_in_method.call(*new_args, io: @io)

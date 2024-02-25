@@ -188,7 +188,7 @@ class Compiler
         type_of_fun = retrieve_type(exp.name, env, non_generic_vars)
         raise UndefinedSymbol, "undefined method #{exp.name}" unless type_of_fun
 
-        type_of_args = @stack.pop(exp.arg_size)
+        type_of_args = @stack.pop(exp.arg_count)
 
         type_of_return = TypeVariable.new(self)
         unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return))

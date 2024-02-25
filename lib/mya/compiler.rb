@@ -78,7 +78,7 @@ class Compiler
         transform(arg, instructions)
       end
       @calls[node.name] << { args: arg_instructions }
-      instruction = CallInstruction.new(node.name, arg_size: args.size, line: node.location.start_line)
+      instruction = CallInstruction.new(node.name, arg_count: args.size, line: node.location.start_line)
       instructions << instruction
       instruction
     when Prism::IfNode

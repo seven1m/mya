@@ -146,19 +146,19 @@ class Compiler
   end
 
   class CallInstruction < Instruction
-    def initialize(name, arg_size:, line:)
-      super(:call, arg: name, extra_arg: arg_size, line:)
+    def initialize(name, arg_count:, line:)
+      super(:call, arg: name, extra_arg: arg_count, line:)
     end
 
     def name = arg
-    def arg_size = extra_arg
+    def arg_count = extra_arg
 
     def to_h
       {
         type: type!,
         instruction: :call,
         name:,
-        arg_size:,
+        arg_count:,
       }
     end
   end
