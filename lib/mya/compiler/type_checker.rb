@@ -13,7 +13,9 @@ class Compiler
       @name ||= @type_checker.next_variable_name
     end
 
-    alias to_s name
+    def to_s
+      name.to_s
+    end
 
     def inspect
       "TypeVariable(id = #{id})"
@@ -37,7 +39,7 @@ class Compiler
     def to_s
       case types.size
       when 0
-        name
+        name.to_s
       when 2
         "(#{types[0]} #{name} #{types[1]})"
       else
@@ -64,7 +66,7 @@ class Compiler
     def to_s
       arg_types = types[0...-1]
       return_type = types.last
-      "([#{arg_types.map(&:to_s).join(', ')}] -> #{return_type.to_s})"
+      "([#{arg_types.join(', ')}] -> #{return_type})"
     end
 
     def inspect
@@ -82,9 +84,9 @@ class Compiler
     end
   end
 
-  IntType = TypeOperator.new(:int, [])
-  StrType = TypeOperator.new(:str, [])
-  BoolType = TypeOperator.new(:bool, [])
+  IntType = TypeOperator.new('int', [])
+  StrType = TypeOperator.new('str', [])
+  BoolType = TypeOperator.new('bool', [])
 
   class TypeChecker
     class Error < StandardError; end
@@ -278,7 +280,7 @@ class Compiler
           if a.name == b.name && a.types.size == b.types.size
             unify_args(a.types, b.types)
           else
-            raise TypeClash, "#{a.to_s} cannot unify with #{b.to_s}"
+            raise TypeClash, "#{a} cannot unify with #{b}"
           end
         else
           raise "Unknown type: #{b.inspect}"

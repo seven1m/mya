@@ -167,7 +167,7 @@ class Compiler
       end
 
       def llvm_type(type)
-        case type
+        case type.to_sym
         when :bool
           LLVM::Int1
         when :int
@@ -180,7 +180,7 @@ class Compiler
       end
 
       def llvm_type_to_ruby(value, type)
-        case type
+        case type.to_sym
         when :bool
           value.to_i == -1
         when :int
@@ -188,6 +188,8 @@ class Compiler
         when :str
           value.to_ptr.read_pointer.read_string
           #value.to_ptr.read_string
+        else
+          raise "Unknown type: #{type.inspect}"
         end
       end
 
