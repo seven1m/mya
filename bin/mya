@@ -16,9 +16,7 @@ code = if args.first == '-e'
 instructions = Compiler.new(code).compile
 
 if dump_ir
-  instructions.each_with_index do |instruction, index|
-    puts "#{index}: #{instruction.to_h.inspect}"
-  end
+  pp instructions.map(&:to_h)
 end
 
 if llvm
