@@ -127,11 +127,21 @@ describe VM do
     expect(execute(code)).must_equal(5)
   end
 
-  it 'evaluates examples/fib.rb' do
-    code = File.read(File.expand_path('../examples/fib.rb', __dir__))
+  def execute_file(path)
+    code = File.read(path)
     io = StringIO.new
     execute(code, io:)
     io.rewind
-    expect(io.read).must_equal("55\n")
+    io.read
+  end
+
+  it 'evaluates examples/fib.rb' do
+    result = execute_file(File.expand_path('../examples/fib.rb', __dir__))
+    expect(result).must_equal("55\n");
+  end
+
+  it 'evaluates examples/fact.rb' do
+    result = execute_file(File.expand_path('../examples/fact.rb', __dir__))
+    expect(result).must_equal("3628800\n")
   end
 end

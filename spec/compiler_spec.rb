@@ -275,4 +275,51 @@ describe Compiler do
       { type: :int, instruction: :call, name: :puts, arg_size: 1 }
     ]
   end
+
+  it 'compiles examples/fact.rb' do
+    code = File.read(File.expand_path('../examples/fact.rb', __dir__))
+    expect(compile(code)).must_equal_with_diff [
+      {
+        type: "([int, int] -> int)",
+        instruction: :def,
+        name: :fact,
+        param_size: 2,
+        params: [:n, :result],
+        body: [
+          { type: :int, instruction: :push_arg, index: 0 },
+          { type: :int, instruction: :set_var, name: :n },
+          { type: :int, instruction: :push_arg, index: 1 },
+          { type: :int, instruction: :set_var, name: :result },
+          { type: :int, instruction: :push_var, name: :n },
+          { type: :int, instruction: :push_int, value: 0 },
+          { type: :bool, instruction: :call, name: :==, arg_size: 2 },
+          {
+            type: :int,
+            instruction: :if,
+            if_true: [
+              {
+                type: :int,
+                instruction: :push_var,
+                name: :result
+              }
+            ],
+            if_false: [
+              { type: :int, instruction: :push_var, name: :n },
+              { type: :int, instruction: :push_int, value: 1 },
+              { type: :int, instruction: :call, name: :-, arg_size: 2 },
+              { type: :int, instruction: :push_var, name: :result },
+              { type: :int, instruction: :push_var, name: :n },
+              { type: :int, instruction: :call, name: :*, arg_size: 2 },
+              { type: :int, instruction: :call, name: :fact, arg_size: 2 }
+            ]
+          }
+        ]
+      },
+
+      { type: :int, instruction: :push_int, value: 10 },
+      { type: :int, instruction: :push_int, value: 1 },
+      { type: :int, instruction: :call, name: :fact, arg_size: 2 },
+      { type: :int, instruction: :call, name: :puts, arg_size: 1 },
+    ]
+  end
 end

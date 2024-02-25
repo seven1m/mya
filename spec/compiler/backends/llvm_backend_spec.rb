@@ -150,15 +150,24 @@ describe Compiler::Backends::LLVMBackend do
     expect(execute(code)).must_equal(5)
   end
 
-  it 'compiles examples/fib.rb to LLVM IR' do
-    temp = Tempfile.create('fib.ll')
+  def execute_file(path)
+    temp = Tempfile.create('compiled.ll')
     temp.close
-    code = File.read(File.expand_path('../../../examples/fib.rb', __dir__))
+    code = File.read(path)
     instructions = Compiler.new(code).compile
     Compiler::Backends::LLVMBackend.new(instructions).dump_ir_to_file(temp.path)
-    result = `lli #{temp.path} 2>&1`
-    expect(result).must_equal("55\n")
+    `lli #{temp.path} 2>&1`
   ensure
     File.unlink(temp.path)
+  end
+
+  it 'evaluates examples/fib.rb' do
+    result = execute_file(File.expand_path('../../../examples/fib.rb', __dir__))
+    expect(result).must_equal("55\n");
+  end
+
+  it 'evaluates examples/fact.rb' do
+    result = execute_file(File.expand_path('../../../examples/fact.rb', __dir__))
+    expect(result).must_equal("3628800\n")
   end
 end

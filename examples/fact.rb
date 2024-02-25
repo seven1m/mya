@@ -1,9 +1,9 @@
-def fact(n)
+def fact(n, result)
   if n == 0
-    1
+    result
   else
-    n * fact(n - 1)
+    fact(n - 1, result * n)
   end
 end
 
-puts fact(10)
+puts fact(10, 1)
