@@ -188,7 +188,7 @@ describe Compiler do
 
   it 'compiles if expressions' do
     code = <<~CODE
-      if 1 == 1
+      if 1
         2
       else
         3
@@ -196,8 +196,6 @@ describe Compiler do
     CODE
     expect(compile(code)).must_equal_with_diff [
       { type: :int, instruction: :push_int, value: 1 },
-      { type: :int, instruction: :push_int, value: 1 },
-      { type: :bool, instruction: :call, name: :==, arg_size: 2 },
       {
         type: :int,
         instruction: :if,

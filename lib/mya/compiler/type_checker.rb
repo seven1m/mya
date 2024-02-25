@@ -197,7 +197,6 @@ class Compiler
         type_of_return
       when IfInstruction
         condition = @stack.pop
-        unify_type(condition, BoolType)
         type_of_then = analyze_exp(exp.if_true, env, non_generic_vars)
         type_of_else = analyze_exp(exp.if_false, env, non_generic_vars)
         unify_type(type_of_then, type_of_else)
