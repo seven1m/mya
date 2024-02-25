@@ -196,15 +196,14 @@ class Compiler
   end
 
   class DefInstruction < Instruction
-    def initialize(name, param_size:, line:)
-      super(:def, arg: name, extra_arg: param_size, line:)
+    def initialize(name, line:)
+      super(:def, arg: name, line:)
       @params = []
     end
 
     attr_accessor :body, :params
 
     def name = arg
-    def param_size = extra_arg
 
     def return_type
       (@pruned_type || @type.prune).types.last.name.to_sym
@@ -215,7 +214,6 @@ class Compiler
         type: type!,
         instruction: :def,
         name:,
-        param_size:,
         params:,
         body: body.map(&:to_h)
       }

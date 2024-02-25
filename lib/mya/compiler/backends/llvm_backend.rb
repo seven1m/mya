@@ -112,7 +112,7 @@ class Compiler
         when DefInstruction
           @index += 1
           name = instruction.name
-          param_types = (0...instruction.param_size).map do |i|
+          param_types = (0...instruction.params.size).map do |i|
             llvm_type(instruction.body.fetch(i * 2).type!)
           end
           return_type = llvm_type(instruction.return_type)

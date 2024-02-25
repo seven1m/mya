@@ -57,7 +57,7 @@ class Compiler
     when Prism::DefNode
       @scope_stack << { vars: {} }
       params = (node.parameters&.requireds || [])
-      instruction = DefInstruction.new(node.name, param_size: params.size, line: node.location.start_line)
+      instruction = DefInstruction.new(node.name, line: node.location.start_line)
       instructions << instruction
       def_instructions = []
       params.each_with_index do |param, index|

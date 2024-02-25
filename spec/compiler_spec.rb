@@ -62,7 +62,6 @@ describe Compiler do
         type: '([] -> str)',
         instruction: :def,
         name: :foo,
-        param_size: 0,
         params: [],
         body: [
           { type: :str, instruction: :push_str, value: 'foo' },
@@ -72,7 +71,6 @@ describe Compiler do
         type: '([] -> int)',
         instruction: :def,
         name: :bar,
-        param_size: 0,
         params: [],
         body: [
           { type: :int, instruction: :push_int, value: 1 },
@@ -112,7 +110,6 @@ describe Compiler do
         type: '([int] -> int)',
         instruction: :def,
         name: :bar,
-        param_size: 1,
         params: [:a],
         body: [
           { type: :int, instruction: :push_arg, index: 0 },
@@ -125,7 +122,6 @@ describe Compiler do
         type: '([str, int] -> str)',
         instruction: :def,
         name: :foo,
-        param_size: 2,
         params: [:a, :b],
         body: [
           { type: :str, instruction: :push_arg, index: 0 },
@@ -229,7 +225,6 @@ describe Compiler do
         type: '([int] -> int)',
         instruction: :def,
         name: :fib,
-        param_size: 1,
         params: [:n],
         body: [
           { type: :int, instruction: :push_arg, index: 0 },
@@ -283,7 +278,6 @@ describe Compiler do
         type: "([int, int] -> int)",
         instruction: :def,
         name: :fact,
-        param_size: 2,
         params: [:n, :result],
         body: [
           { type: :int, instruction: :push_arg, index: 0 },
