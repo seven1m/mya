@@ -322,25 +322,6 @@ class TypeChecker
   end
 end
 
-def debug(type, indent = 0)
-  case type
-  when FunctionType
-    puts ' ' * indent + 'FunctionType'
-    puts ' ' * indent + '  arg:'
-    debug(type.types[0], indent + 4)
-    puts ' ' * indent + '  body:'
-    debug(type.types[1], indent + 4)
-  when TypeVariable
-    puts ' ' * indent + 'TypeVariable'
-    puts ' ' * indent + "  id: #{type.id}"
-    puts ' ' * indent + "  name: #{type.name}"
-    puts ' ' * indent + '  instance:'
-    debug(type.instance, indent + 4)
-  when nil
-    puts ' ' * indent + 'nil'
-  end
-end
-
 if $0 == __FILE__
   require 'minitest/autorun'
   require 'minitest/spec'

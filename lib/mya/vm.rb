@@ -46,32 +46,32 @@ class VM
   def execute(instruction)
     case instruction
     when Compiler::PushIntInstruction, Compiler::PushStrInstruction
-      @stack << instruction.arg
+      @stack << instruction.value
     when Compiler::PushTrueInstruction
       @stack << true
     when Compiler::PushFalseInstruction
       @stack << false
     when Compiler::SetVarInstruction
-      vars[instruction.arg] = @stack.pop
+      vars[instruction.name] = @stack.pop
     when Compiler::PushVarInstruction
-      @stack << vars.fetch(instruction.arg)
+      @stack << vars.fetch(instruction.name)
     when Compiler::DefInstruction
-      @methods[instruction.arg] = instruction
+      @methods[instruction.name] = instruction
     when Compiler::CallInstruction
       new_args = @stack.pop(instruction.arg_count)
-      if BUILT_IN_METHODS.key?(instruction.arg)
-        @stack << if (built_in_method = BUILT_IN_METHODS[instruction.arg])
+      if BUILT_IN_METHODS.key?(instruction.name)
+        @stack << if (built_in_method = BUILT_IN_METHODS[instruction.name])
                     built_in_method.call(*new_args, io: @io)
                   else
-                    new_args.first.send(instruction.arg, *new_args[1..])
+                    new_args.first.send(instruction.name, *new_args[1..])
                   end
       else
-        method = @methods.fetch(instruction.arg)
+        method = @methods.fetch(instruction.name)
         push_frame(instructions: method.body, return_index: @index, with_scope: true)
         @scope_stack << { args: new_args, vars: {} }
       end
     when Compiler::PushArgInstruction
-      @stack << args[instruction.arg]
+      @stack << args[instruction.index]
     when Compiler::IfInstruction
       condition = @stack.pop
       body = if condition

@@ -1,25 +1,16 @@
 class Compiler
   class Instruction
-    def initialize(legacy_name, arg: nil, extra_arg: nil, type: nil, line: nil)
-      @legacy_name = legacy_name
-      @arg = arg
-      @extra_arg = extra_arg
-      @type = type
+    def initialize(line: nil)
       @line = line
     end
 
-    attr_reader :legacy_name, :arg, :extra_arg, :type, :line
+    attr_reader :line
 
     attr_accessor :type
 
     def to_h
       raise NotImplementedError, __method__
     end
-
-    INSTRUCTIONS_WITH_NO_TYPE = %i[
-      else
-      end_def
-    ].freeze
 
     def type!
       return @pruned_type.to_s if @pruned_type
@@ -30,21 +21,21 @@ class Compiler
       raise TypeError, "Not enough information to infer type of #{inspect}" if pruned.is_a?(TypeVariable)
 
       @pruned_type = pruned
-
       @pruned_type.to_s
     end
 
-    def inspect(indent = 0, index = nil)
-      "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} #{@legacy_name}, arg: #{@arg.inspect}>"
+    def inspect
+      "<#{self.class.name} #{instance_variables.map { |iv| "#{iv}=#{instance_variable_get(iv).inspect}" }.join(' ')}>"
     end
   end
 
   class PushIntInstruction < Instruction
     def initialize(value, line:)
-      super(:push_int, arg: value, type: :int, line:)
+      super(line:)
+      @value = value
     end
 
-    def value = arg
+    attr_reader :value
 
     def to_h
       {
@@ -57,10 +48,11 @@ class Compiler
 
   class PushStrInstruction < Instruction
     def initialize(value, line:)
-      super(:push_str, arg: value, type: :str, line:)
+      super(line:)
+      @value = value
     end
 
-    def value = arg
+    attr_reader :value
 
     def to_h
       {
@@ -73,7 +65,7 @@ class Compiler
 
   class PushTrueInstruction < Instruction
     def initialize(line:)
-      super(:push_true, type: :bool, line:)
+      super(line:)
     end
 
     def to_h
@@ -86,7 +78,7 @@ class Compiler
 
   class PushFalseInstruction < Instruction
     def initialize(line:)
-      super(:push_false, type: :bool, line:)
+      super(line:)
     end
 
     def to_h
@@ -99,10 +91,11 @@ class Compiler
 
   class PushVarInstruction < Instruction
     def initialize(name, line:)
-      super(:push_var, arg: name, line:)
+      super(line:)
+      @name = name
     end
 
-    def name = arg
+    attr_reader :name
 
     def to_h
       {
@@ -115,10 +108,11 @@ class Compiler
 
   class SetVarInstruction < Instruction
     def initialize(name, line:)
-      super(:set_var, arg: name, line:)
+      super(line:)
+      @name = name
     end
 
-    def name = arg
+    attr_reader :name
 
     def to_h
       {
@@ -131,10 +125,11 @@ class Compiler
 
   class PushArgInstruction < Instruction
     def initialize(index, line:)
-      super(:push_arg, arg: index, line:)
+      super(line:)
+      @index = index
     end
 
-    def index = arg
+    attr_reader :index
 
     def to_h
       {
@@ -147,11 +142,12 @@ class Compiler
 
   class CallInstruction < Instruction
     def initialize(name, arg_count:, line:)
-      super(:call, arg: name, extra_arg: arg_count, line:)
+      super(line:)
+      @name = name
+      @arg_count = arg_count
     end
 
-    def name = arg
-    def arg_count = extra_arg
+    attr_reader :name, :arg_count
 
     def to_h
       {
@@ -165,7 +161,7 @@ class Compiler
 
   class IfInstruction < Instruction
     def initialize(line:)
-      super(:if, line:)
+      super(line:)
     end
 
     attr_accessor :if_true, :if_false
@@ -178,32 +174,17 @@ class Compiler
         if_false: if_false.map(&:to_h)
       }
     end
-
-    def inspect(indent = 0, index = nil)
-      s = "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} #{@legacy_name}, arg: #{@arg.inspect}>"
-      s << "\n#{' ' * indent}  if_true: ["
-      if_true.each_with_index do |instruction, index|
-        s << "\n#{instruction.inspect(indent + 4, index)}"
-      end
-      s << "\n#{' ' * indent}  ]"
-      s << "\n#{' ' * indent}  if_false: ["
-      if_false.each_with_index do |instruction, index|
-        s << "\n#{instruction.inspect(indent + 4, index)}"
-      end
-      s << "\n#{' ' * indent}  ]"
-      s
-    end
   end
 
   class DefInstruction < Instruction
     def initialize(name, line:)
-      super(:def, arg: name, line:)
+      super(line:)
+      @name = name
       @params = []
     end
 
+    attr_reader :name
     attr_accessor :body, :params
-
-    def name = arg
 
     def return_type
       (@pruned_type || @type.prune).types.last.name.to_sym
@@ -217,17 +198,6 @@ class Compiler
         params:,
         body: body.map(&:to_h)
       }
-    end
-
-    def inspect(indent = 0, index = nil)
-      s = "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} name: #{name}>"
-      s << "\n#{' ' * indent}  params: #{params.inspect}"
-      s << "\n#{' ' * indent}  body: ["
-      body.each_with_index do |instruction, index|
-        s << "\n#{instruction.inspect(indent + 4, index)}"
-      end
-      s << "\n#{' ' * indent}  ]"
-      s
     end
   end
 end
