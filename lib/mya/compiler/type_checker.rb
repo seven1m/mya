@@ -1,3 +1,5 @@
+require 'set'
+
 class Compiler
   class TypeVariable
     def initialize(type_checker)
