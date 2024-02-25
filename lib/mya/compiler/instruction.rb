@@ -10,7 +10,7 @@ class Compiler
 
     attr_reader :legacy_name, :arg, :extra_arg, :type, :line
 
-    attr_accessor :infered_type
+    attr_accessor :type
 
     def to_h
       raise NotImplementedError, __method__
@@ -22,13 +22,16 @@ class Compiler
     ].freeze
 
     def type!
-      raise "expected @infered_type to be set on #{legacy_name} #{object_id}" unless @infered_type
+      return @pruned_type.to_s if @pruned_type
 
-      pruned = @infered_type.prune
-      if pruned.is_a?(TypeVariable)
-        raise TypeError, "Not enough information to infer type of #{inspect}"
-      end
-      pruned.to_s
+      raise "No type set!" unless @type
+
+      pruned = @type.prune
+      raise TypeError, "Not enough information to infer type of #{inspect}" if pruned.is_a?(TypeVariable)
+
+      @pruned_type = pruned
+
+      @pruned_type.to_s
     end
 
     def inspect(indent = 0, index = nil)
@@ -204,7 +207,7 @@ class Compiler
     def param_size = extra_arg
 
     def return_type
-      @infered_type.prune.types.last.name.to_sym
+      (@pruned_type || @type.prune).types.last.name.to_sym
     end
 
     def to_h

@@ -132,13 +132,13 @@ class Compiler
         last_type
       when PushIntInstruction
         @stack << IntType
-        exp.infered_type = IntType
+        exp.type = IntType
       when PushStrInstruction
         @stack << StrType
-        exp.infered_type = StrType
+        exp.type = StrType
       when PushTrueInstruction, PushFalseInstruction
         @stack << BoolType
-        exp.infered_type = BoolType
+        exp.type = BoolType
       when SetVarInstruction
         type = @stack.pop
         if (existing_type = env[exp.name])
@@ -146,16 +146,16 @@ class Compiler
         else
           env[exp.name] = type
         end
-        exp.infered_type = type
+        exp.type = type
       when PushVarInstruction
         type = retrieve_type(exp.name, env, non_generic_vars)
         raise UndefinedSymbol, "undefined symbol #{exp.name}" unless type
         @stack << type
-        exp.infered_type = type
+        exp.type = type
       when PushArgInstruction
         type = @scope_stack.last.fetch(:parameter_types).fetch(exp.index)
         @stack << type
-        exp.infered_type = type
+        exp.type = type
       when DefInstruction
         new_type_var = TypeVariable.new(self)
         env[exp.name] = new_type_var
@@ -179,7 +179,7 @@ class Compiler
 
         env[exp.name] = type_of_fun
         non_generic_vars << type_of_fun
-        exp.infered_type = type_of_fun
+        exp.type = type_of_fun
 
         type_of_fun
       when CallInstruction
@@ -191,7 +191,7 @@ class Compiler
         type_of_return = TypeVariable.new(self)
         unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return))
 
-        exp.infered_type = type_of_return
+        exp.type = type_of_return
 
         @stack << type_of_return
         type_of_return
@@ -200,7 +200,7 @@ class Compiler
         type_of_then = analyze_exp(exp.if_true, env, non_generic_vars)
         type_of_else = analyze_exp(exp.if_false, env, non_generic_vars)
         unify_type(type_of_then, type_of_else)
-        exp.infered_type = type_of_then
+        exp.type = type_of_then
       #when Ary
         #exp.members.each_cons(2) do |a, b|
           #unify_type(
