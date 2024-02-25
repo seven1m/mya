@@ -6,17 +6,14 @@ class Compiler
       @extra_arg = extra_arg
       @type = type
       @line = line
-      @dependencies = []
     end
 
-    attr_reader :legacy_name, :arg, :extra_arg, :type, :line, :dependencies
+    attr_reader :legacy_name, :arg, :extra_arg, :type, :line
+
+    attr_accessor :infered_type
 
     def to_h
       raise NotImplementedError, __method__
-    end
-
-    def add_dependency(dependency)
-      @dependencies << dependency
     end
 
     INSTRUCTIONS_WITH_NO_TYPE = %i[
@@ -25,19 +22,13 @@ class Compiler
     ].freeze
 
     def type!
-      return @type if @type
+      raise "expected @infered_type to be set on #{legacy_name} #{object_id}" unless @infered_type
 
-      return if INSTRUCTIONS_WITH_NO_TYPE.include?(@legacy_name)
-
-      unique_types = @dependencies.map(&:type!).compact.uniq
-
-      if unique_types.empty?
-        raise TypeError, "Not enough information to infer type of instruction '#{@legacy_name}'"
-      elsif unique_types.size == 1
-        unique_types.first
-      else
-        raise TypeError, "Instruction '#{@legacy_name}' could have more than one type: #{unique_types.sort.inspect}"
+      pruned = @infered_type.prune
+      if pruned.is_a?(TypeVariable)
+        raise TypeError, "Not enough information to infer type of #{inspect}"
       end
+      pruned.to_s
     end
 
     def inspect(indent = 0, index = nil)
@@ -212,6 +203,10 @@ class Compiler
     def name = arg
     def param_size = extra_arg
 
+    def return_type
+      @infered_type.prune.types.last.name.to_sym
+    end
+
     def to_h
       {
         type: type!,
@@ -224,7 +219,8 @@ class Compiler
     end
 
     def inspect(indent = 0, index = nil)
-      s = "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} #{@legacy_name}, arg: #{@arg.inspect}>"
+      s = "#{' ' * indent}#{index ? "#{index}. " : ''}<#{self.class.name} name: #{name}>"
+      s << "\n#{' ' * indent}  params: #{params.inspect}"
       s << "\n#{' ' * indent}  body: ["
       body.each_with_index do |instruction, index|
         s << "\n#{instruction.inspect(indent + 4, index)}"

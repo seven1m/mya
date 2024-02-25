@@ -59,7 +59,7 @@ class Compiler
         @index = 0
         build_function(@entry, @instructions)
         @lib.link_into(@module)
-        @module.dump if @dump
+        #@module.dump if @dump || !@module.valid?
         raise 'Bad code generated' unless @module.valid?
       end
 
@@ -113,9 +113,9 @@ class Compiler
           @index += 1
           name = instruction.name
           param_types = (0...instruction.param_size).map do |i|
-            llvm_type(@instructions.fetch(@index + (i * 2)).type!)
+            llvm_type(instruction.body.fetch(i * 2).type!)
           end
-          return_type = llvm_type(instruction.type!)
+          return_type = llvm_type(instruction.return_type)
           @methods[name] = fn  = @module.functions.add(name, param_types, return_type)
           build_function(fn, instruction.body)
         when CallInstruction

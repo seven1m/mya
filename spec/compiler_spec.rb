@@ -6,24 +6,24 @@ describe Compiler do
   end
 
   it 'compiles integers' do
-    expect(compile('1')).must_equal [
+    expect(compile('1')).must_equal_with_diff [
       { type: :int, instruction: :push_int, value: 1 }
     ]
   end
 
   it 'compiles strings' do
-    expect(compile('"foo"')).must_equal [
+    expect(compile('"foo"')).must_equal_with_diff [
       { type: :str, instruction: :push_str, value: 'foo' }
     ]
   end
 
   it 'compiles booleans' do
-    expect(compile('true')).must_equal [{ type: :bool, instruction: :push_true }]
-    expect(compile('false')).must_equal [{ type: :bool, instruction: :push_false }]
+    expect(compile('true')).must_equal_with_diff [{ type: :bool, instruction: :push_true }]
+    expect(compile('false')).must_equal_with_diff [{ type: :bool, instruction: :push_false }]
   end
 
   it 'compiles variables set and get' do
-    expect(compile('a = 1; a')).must_equal [
+    expect(compile('a = 1; a')).must_equal_with_diff [
       { type: :int, instruction: :push_int, value: 1 },
       { type: :int, instruction: :set_var, name: :a },
       { type: :int, instruction: :push_var, name: :a }
@@ -31,7 +31,7 @@ describe Compiler do
   end
 
   it 'can set a variable more than once' do
-    expect(compile('a = 1; a = 2')).must_equal [
+    expect(compile('a = 1; a = 2')).must_equal_with_diff [
       { type: :int, instruction: :push_int, value: 1 },
       { type: :int, instruction: :set_var, name: :a },
       { type: :int, instruction: :push_int, value: 2 },
@@ -42,8 +42,8 @@ describe Compiler do
   it 'raises an error if the variable type changes' do
     e = expect do
       compile('a = 1; a = "foo"')
-    end.must_raise TypeError
-    expect(e.message).must_equal 'Variable a was set with more than one type: [:int, :str]'
+    end.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'int cannot unify with str'
   end
 
   it 'compiles method definitions' do
@@ -57,9 +57,9 @@ describe Compiler do
       foo
       bar
     CODE
-    expect(compile(code)).must_equal [
+    expect(compile(code)).must_equal_with_diff [
       {
-        type: :str,
+        type: '([] -> str)',
         instruction: :def,
         name: :foo,
         param_size: 0,
@@ -69,7 +69,7 @@ describe Compiler do
         ]
       },
       {
-        type: :int,
+        type: '([] -> int)',
         instruction: :def,
         name: :bar,
         param_size: 0,
@@ -109,7 +109,7 @@ describe Compiler do
     CODE
     expect(compile(code)).must_equal_with_diff [
       {
-        type: :int,
+        type: '([int] -> int)',
         instruction: :def,
         name: :bar,
         param_size: 1,
@@ -122,7 +122,7 @@ describe Compiler do
       },
 
       {
-        type: :str,
+        type: '([str, int] -> str)',
         instruction: :def,
         name: :foo,
         param_size: 2,
@@ -152,7 +152,7 @@ describe Compiler do
       end
     CODE
     e = expect { compile(code) }.must_raise TypeError
-    expect(e.message).must_equal "Not enough information to infer type of argument 'a' in method 'foo'"
+    expect(e.message).must_match /Not enough information to infer type of/
   end
 
   # NOTE: we don't support monomorphization (yet!)
@@ -166,8 +166,8 @@ describe Compiler do
 
       foo('bar')
     CODE
-    e = expect { compile(code) }.must_raise TypeError
-    expect(e.message).must_equal "Argument 'a' in method 'foo' was called with more than one type: [:int, :str]"
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'int cannot unify with str'
   end
 
   it 'compiles operator expressions' do
@@ -175,7 +175,7 @@ describe Compiler do
       1 + 2
       3 == 4
     CODE
-    expect(compile(code)).must_equal [
+    expect(compile(code)).must_equal_with_diff [
       { type: :int, instruction: :push_int, value: 1 },
       { type: :int, instruction: :push_int, value: 2 },
       { type: :int, instruction: :call, name: :+, arg_size: 2 },
@@ -188,7 +188,7 @@ describe Compiler do
 
   it 'compiles if expressions' do
     code = <<~CODE
-      if 1
+      if 1 == 1
         2
       else
         3
@@ -196,6 +196,8 @@ describe Compiler do
     CODE
     expect(compile(code)).must_equal_with_diff [
       { type: :int, instruction: :push_int, value: 1 },
+      { type: :int, instruction: :push_int, value: 1 },
+      { type: :bool, instruction: :call, name: :==, arg_size: 2 },
       {
         type: :int,
         instruction: :if,
@@ -217,15 +219,16 @@ describe Compiler do
         'foo'
       end
     CODE
-    e = expect { compile(code) }.must_raise TypeError
-    expect(e.message).must_equal "Instruction 'if' could have more than one type: [:int, :str]"
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    #expect(e.message).must_equal "Instruction 'if' could have more than one type: [:int, :str]"
+    expect(e.message).must_equal 'int cannot unify with str'
   end
 
   it 'compiles examples/fib.rb' do
     code = File.read(File.expand_path('../examples/fib.rb', __dir__))
     expect(compile(code)).must_equal_with_diff [
       {
-        type: :int,
+        type: '([int] -> int)',
         instruction: :def,
         name: :fib,
         param_size: 1,

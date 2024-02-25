@@ -1,10 +1,7 @@
 require 'bundler/setup'
 require 'prism'
 require_relative './compiler/instruction'
-require_relative './compiler/dependency'
-require_relative './compiler/call_arg_dependency'
-require_relative './compiler/method_dependency'
-require_relative './compiler/variable_dependency'
+require_relative './compiler/type_checker'
 require_relative './compiler/backends/llvm_backend'
 
 class Compiler
@@ -15,10 +12,10 @@ class Compiler
 
   def compile
     @scope_stack = [{ vars: {} }]
-    @methods = {}
     @calls = Hash.new { |h, k| h[k] = [] }
     @instructions = []
     transform(@ast, @instructions)
+    type_check
     @instructions
   end
 
@@ -51,13 +48,10 @@ class Compiler
     when Prism::LocalVariableWriteNode
       value_instruction = transform(node.value, instructions)
       instruction = SetVarInstruction.new(node.name, line: node.location.start_line)
-      instruction.add_dependency(Dependency.new(instruction: value_instruction))
-      set_var(node.name, instruction)
       instructions << instruction
       instruction
     when Prism::LocalVariableReadNode
       instruction = PushVarInstruction.new(node.name, line: node.location.start_line)
-      instruction.add_dependency(VariableDependency.new(name: node.name, scope:))
       instructions << instruction
       instruction
     when Prism::DefNode
@@ -68,25 +62,13 @@ class Compiler
       def_instructions = []
       params.each_with_index do |param, index|
         i1 = PushArgInstruction.new(index, line: node.location.start_line)
-        i1.add_dependency(
-          CallArgDependency.new(
-            method_name: node.name,
-            calls: @calls[node.name],
-            arg_index: index,
-            arg_name: param.name
-          )
-        )
         def_instructions << i1
         i2 = SetVarInstruction.new(param.name, line: node.location.start_line)
-        i2.add_dependency(i1)
         def_instructions << i2
-        set_var(param.name, i2)
         instruction.params << param.name
       end
       return_instruction = transform(node.body, def_instructions)
       instruction.body = def_instructions
-      instruction.add_dependency(return_instruction)
-      set_method(node.name, instruction)
       @scope_stack.pop
       instruction
     when Prism::CallNode
@@ -97,7 +79,6 @@ class Compiler
       end
       @calls[node.name] << { args: arg_instructions }
       instruction = CallInstruction.new(node.name, arg_size: args.size, line: node.location.start_line)
-      instruction.add_dependency(MethodDependency.new(name: node.name, methods: @methods))
       instructions << instruction
       instruction
     when Prism::IfNode
@@ -108,8 +89,6 @@ class Compiler
       true_result = transform(node.statements, instruction.if_true)
       instruction.if_false = []
       false_result = transform(node.consequent, instruction.if_false)
-      instruction.add_dependency(true_result)
-      instruction.add_dependency(false_result)
       instruction
     when Prism::ElseNode
       transform(node.statements, instructions)
@@ -118,31 +97,15 @@ class Compiler
     end
   end
 
+  def type_check
+    TypeChecker.new.analyze(@instructions)
+  end
+
   def scope
     @scope_stack.last
   end
 
   def vars
     scope.fetch(:vars)
-  end
-
-  def set_var(name, instruction)
-    vars[name] ||= []
-    vars[name] << instruction
-    unique_types = vars[name].map do |dep|
-      dep.type!
-    rescue TypeError
-      # If we don't yet know the type for this dependency,
-      # that's fine, because we might know it later.
-    end.compact.uniq
-    return unless unique_types.size > 1
-
-    raise TypeError, "Variable #{name} was set with more than one type: #{unique_types.inspect}"
-  end
-
-  def set_method(name, instruction)
-    raise TypeError, 'TODO' if @methods[name]
-
-    @methods[name] = instruction
   end
 end
