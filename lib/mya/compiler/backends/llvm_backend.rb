@@ -220,7 +220,7 @@ class Compiler
       end
 
       def fn_puts_str
-        @fn_puts_str ||= @module.functions.add('puts_str', [LLVM::Type.pointer(rc_struct)], LLVM::Type.pointer(rc_struct))
+        @fn_puts_str ||= @module.functions.add('puts_str', [LLVM::Type.pointer(rc_struct)], LLVM::Int32)
       end
 
       def fn_rc_new

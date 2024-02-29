@@ -127,6 +127,17 @@ describe VM do
     expect(execute(code)).must_equal(5)
   end
 
+  it 'evaluates puts for both int and str' do
+    code = <<~CODE
+      puts(123)
+      puts("foo")
+    CODE
+    io = StringIO.new
+    execute(code, io:)
+    io.rewind
+    expect(io.read).must_equal("123\nfoo\n")
+  end
+
   def execute_file(path)
     code = File.read(path)
     io = StringIO.new

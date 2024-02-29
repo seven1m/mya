@@ -33,12 +33,10 @@ void rc_drop(RC *rc) {
 }
 
 int32_t puts_int(int32_t i) {
-    printf("%d\n", i);
-    return i;
+    return printf("%d\n", i);
 }
 
-const RC *puts_str(const RC *rc) {
+int32_t puts_str(const RC *rc) {
     const char *str = rc->ptr;
-    printf("[%s]\n", str);
-    return rc;
+    return printf("%s\n", str);
 }

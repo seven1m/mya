@@ -150,15 +150,27 @@ describe Compiler::Backends::LLVMBackend do
     expect(execute(code)).must_equal(5)
   end
 
-  def execute_file(path)
+  def execute_code(code)
     temp = Tempfile.create('compiled.ll')
     temp.close
-    code = File.read(path)
     instructions = Compiler.new(code).compile
     Compiler::Backends::LLVMBackend.new(instructions).dump_ir_to_file(temp.path)
     `lli #{temp.path} 2>&1`
   ensure
     File.unlink(temp.path)
+  end
+
+  it 'evaluates puts for both int and str' do
+    code = <<~CODE
+      puts(123)
+      puts("foo")
+    CODE
+    out = execute_code(code)
+    expect(out).must_equal("123\nfoo\n")
+  end
+
+  def execute_file(path)
+    execute_code(File.read(path))
   end
 
   it 'evaluates examples/fib.rb' do

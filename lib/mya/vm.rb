@@ -40,7 +40,7 @@ class VM
     '*': nil,
     '/': nil,
     '==': nil,
-    'puts': ->(arg, io:) { io.puts(arg); arg }
+    'puts': ->(arg, io:) { io.puts(arg); arg.to_s.size }
   }.freeze
 
   def execute(instruction)

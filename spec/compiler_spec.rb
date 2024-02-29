@@ -218,6 +218,17 @@ describe Compiler do
     expect(e.message).must_equal 'int cannot unify with str'
   end
 
+  it 'compiles calls to puts for both int and str' do
+    expect(compile('puts(1)')).must_equal_with_diff [
+      { type: 'int', instruction: :push_int, value: 1 },
+      { type: 'int', instruction: :call, name: :puts, arg_count: 1 }
+    ]
+    expect(compile('puts("foo")')).must_equal_with_diff [
+      { type: 'str', instruction: :push_str, value: 'foo' },
+      { type: 'int', instruction: :call, name: :puts, arg_count: 1 }
+    ]
+  end
+
   it 'compiles examples/fib.rb' do
     code = File.read(File.expand_path('../examples/fib.rb', __dir__))
     expect(compile(code)).must_equal_with_diff [

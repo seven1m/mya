@@ -74,6 +74,16 @@ class Compiler
     end
   end
 
+  class UnionType < TypeOperator
+    def initialize(*types)
+      super('union', types)
+    end
+
+    def to_s
+      "(#{types.join(' | ')})"
+    end
+  end
+
   class AryType < TypeOperator
     def initialize(type)
       super('array', [type])
@@ -277,7 +287,9 @@ class Compiler
         when TypeVariable
           unify_type(b, a)
         when TypeOperator
-          if a.name == b.name && a.types.size == b.types.size
+          if a.name == 'union' && (matching = a.types.detect { |t| t.name == b.name && t.types.size == b.types.size })
+            unify_type(matching, b)
+          elsif a.name == b.name && a.types.size == b.types.size
             unify_args(a.types, b.types)
           else
             raise TypeClash, "#{a} cannot unify with #{b}"
@@ -310,8 +322,7 @@ class Compiler
         "/": FunctionType.new(IntType, IntType, IntType),
         nth: FunctionType.new(array, IntType, array_type),
         push: FunctionType.new(array, array_type, array_type),
-        puts: FunctionType.new(IntType, IntType),
-        puts_str: FunctionType.new(StrType, StrType),
+        puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
       }
     end
   end
