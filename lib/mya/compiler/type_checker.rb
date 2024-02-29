@@ -156,7 +156,7 @@ class Compiler
       when SetVarInstruction
         type = @stack.pop
         if (existing_type = env[exp.name])
-          unify_type(existing_type, type)
+          unify_type(existing_type, type, exp)
         else
           env[exp.name] = type
         end
@@ -203,7 +203,7 @@ class Compiler
         type_of_args = @stack.pop(exp.arg_count)
 
         type_of_return = TypeVariable.new(self)
-        unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return))
+        unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return), exp)
 
         exp.type = type_of_return
 
@@ -213,7 +213,7 @@ class Compiler
         condition = @stack.pop
         type_of_then = analyze_exp(exp.if_true, env, non_generic_vars)
         type_of_else = analyze_exp(exp.if_false, env, non_generic_vars)
-        unify_type(type_of_then, type_of_else)
+        unify_type(type_of_then, type_of_else, exp)
         exp.type = type_of_then
       #when Ary
         #exp.members.each_cons(2) do |a, b|
@@ -270,7 +270,7 @@ class Compiler
       list.any? { |t| occurs_in_type?(type_var, t) }
     end
 
-    def unify_type(a, b)
+    def unify_type(a, b, instruction = nil)
       a = a.prune
       b = b.prune
       case a
@@ -285,14 +285,14 @@ class Compiler
       when TypeOperator
         case b
         when TypeVariable
-          unify_type(b, a)
+          unify_type(b, a, instruction)
         when TypeOperator
           if a.name == 'union' && (matching = a.types.detect { |t| t.name == b.name && t.types.size == b.types.size })
-            unify_type(matching, b)
+            unify_type(matching, b, instruction)
           elsif a.name == b.name && a.types.size == b.types.size
-            unify_args(a.types, b.types)
+            unify_args(a.types, b.types, instruction)
           else
-            raise TypeClash, "#{a} cannot unify with #{b}"
+            raise_type_clash_error(a, b, instruction)
           end
         else
           raise "Unknown type: #{b.inspect}"
@@ -302,10 +302,24 @@ class Compiler
       end
     end
 
-    def unify_args(list1, list2)
+    def unify_args(list1, list2, instruction)
       list1.zip(list2) do |a, b|
-        unify_type(a, b)
+        unify_type(a, b, instruction)
       end
+    end
+
+    def raise_type_clash_error(a, b, instruction = nil)
+      message = case instruction
+      when CallInstruction
+        "#{a} cannot unify with #{b} in call to #{instruction.name}"
+      when IfInstruction
+        "one branch of `if` has type #{a} and the other has type #{b}"
+      when SetVarInstruction
+        "the variable #{instruction.name} has type #{a} already; you cannot change it to type #{b}"
+      else
+        "#{a} cannot unify with #{b} #{instruction.inspect}"
+      end
+      raise TypeClash, message
     end
 
     def build_initial_env

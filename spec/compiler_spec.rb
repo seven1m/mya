@@ -43,7 +43,7 @@ describe Compiler do
     e = expect do
       compile('a = 1; a = "foo"')
     end.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal 'int cannot unify with str'
+    expect(e.message).must_equal 'the variable a has type int already; you cannot change it to type str'
   end
 
   it 'compiles method definitions' do
@@ -163,7 +163,19 @@ describe Compiler do
       foo('bar')
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal 'int cannot unify with str'
+    expect(e.message).must_equal 'int cannot unify with str in call to foo'
+  end
+
+  it 'raises an error if the arg count of method and call do not match' do
+    code = <<~CODE
+      def foo(a)
+        a
+      end
+
+      foo(1, 2)
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal '([a] -> a) cannot unify with ([int, int] -> b) in call to foo'
   end
 
   it 'compiles operator expressions' do
@@ -214,8 +226,7 @@ describe Compiler do
       end
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    #expect(e.message).must_equal "Instruction 'if' could have more than one type: ['int', 'str']"
-    expect(e.message).must_equal 'int cannot unify with str'
+    expect(e.message).must_equal 'one branch of `if` has type int and the other has type str'
   end
 
   it 'compiles calls to puts for both int and str' do
