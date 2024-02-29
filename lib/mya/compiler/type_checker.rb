@@ -215,20 +215,16 @@ class Compiler
         type_of_else = analyze_exp(exp.if_false, env, non_generic_vars)
         unify_type(type_of_then, type_of_else, exp)
         exp.type = type_of_then
-      #when Ary
-        #exp.members.each_cons(2) do |a, b|
-          #unify_type(
-            #analyze_exp(a, env, non_generic_vars),
-            #analyze_exp(b, env, non_generic_vars)
-          #)
-        #end
-        #member_type = if exp.members.any?
-          #analyze_exp(exp.members.first, env, non_generic_vars)
-        #else
-          #TypeVariable.new(self)
-        #end
-        #non_generic_vars << member_type
-        #AryType.new(member_type)
+      when PushArrayInstruction
+        members = @stack.pop(exp.size)
+        members.each_cons(2) do |a, b|
+          unify_type(a, b)
+        end
+        member_type = members.first || TypeVariable.new(self)
+        non_generic_vars << member_type
+        type_of_array = AryType.new(member_type)
+        @stack << type_of_array
+        exp.type = type_of_array
       else
         raise "unknown expression: #{exp.inspect}"
       end
@@ -335,6 +331,7 @@ class Compiler
         "*": FunctionType.new(IntType, IntType, IntType),
         "/": FunctionType.new(IntType, IntType, IntType),
         nth: FunctionType.new(array, IntType, array_type),
+        first: FunctionType.new(array, array_type),
         push: FunctionType.new(array, array_type, array_type),
         puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
       }

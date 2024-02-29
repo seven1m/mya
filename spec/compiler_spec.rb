@@ -22,6 +22,22 @@ describe Compiler do
     expect(compile('false')).must_equal_with_diff [{ type: 'bool', instruction: :push_false }]
   end
 
+  it 'compiles arrays' do
+    code = <<~CODE
+      a = [1, 2, 3]
+      a.first
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: 'int', instruction: :push_int, value: 1 },
+      { type: 'int', instruction: :push_int, value: 2 },
+      { type: 'int', instruction: :push_int, value: 3 },
+      { type: '(int array)', instruction: :push_array, size: 3 },
+      { type: '(int array)', instruction: :set_var, name: :a },
+      { type: '(int array)', instruction: :push_var, name: :a },
+      { type: 'int', instruction: :call, name: :first, arg_count: 1 },
+    ]
+  end
+
   it 'compiles variables set and get' do
     expect(compile('a = 1; a')).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },

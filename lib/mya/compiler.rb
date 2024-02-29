@@ -92,6 +92,13 @@ class Compiler
       instruction
     when Prism::ElseNode
       transform(node.statements, instructions)
+    when Prism::ArrayNode
+      node.elements.each do |element|
+        transform(element, instructions)
+      end
+      instruction = PushArrayInstruction.new(node.elements.size, line: node.location.start_line)
+      instructions << instruction
+      instruction
     else
       raise "unknown node: #{node.inspect}"
     end

@@ -89,6 +89,23 @@ class Compiler
     end
   end
 
+  class PushArrayInstruction < Instruction
+    def initialize(size, line:)
+      super(line:)
+      @size = size
+    end
+
+    attr_reader :size
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_array,
+        size:
+      }
+    end
+  end
+
   class PushVarInstruction < Instruction
     def initialize(name, line:)
       super(line:)
