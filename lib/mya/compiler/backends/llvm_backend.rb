@@ -16,6 +16,7 @@ class Compiler
         @methods = {}
         @dump = dump
         @lib = LLVM::Module.parse_ir(LIB_PATH)
+        @rc = LLVM::Struct(LLVM::Type.pointer, LLVM::Int32, 'rc')
       end
 
       attr_reader :instructions
@@ -38,7 +39,7 @@ class Compiler
         '*': ->(builder, lhs, rhs) { builder.mul(lhs, rhs) },
         '/': ->(builder, lhs, rhs) { builder.sdiv(lhs, rhs) },
         '==': ->(builder, lhs, rhs) { builder.icmp(:eq, lhs, rhs) },
-        'puts': ->(builder, arg) { compile_puts(builder, arg) },
+        'puts': ->(builder, arg) { build_puts(builder, arg) },
       }.freeze
 
       def execute(fn)
@@ -59,21 +60,21 @@ class Compiler
         @index = 0
         build_function(@entry, @instructions)
         @lib.link_into(@module)
-        #@module.dump if @dump || !@module.valid?
-        raise 'Bad code generated' unless @module.valid?
+        @module.dump if @dump || !@module.valid?
+        @module.verify!
       end
 
       def build_function(function, instructions)
         @scope_stack << { function:, vars: {} }
         function.basic_blocks.append.build do |builder|
           build_instructions(function, builder, instructions) do |return_value|
-            case function.return_type
-            when :str
-              zero = LLVM.Int(0)
-              builder.ret builder.gep(return_value, zero)
-            else
-              builder.ret return_value
-            end
+            builder.ret return_value
+            #case function.return_type
+            #when :str
+              #builder.ret builder.gep(return_value, LLVM::Int(0))
+            #else
+              #builder.ret return_value
+            #end
           end
         end
         @scope_stack.pop
@@ -92,10 +93,7 @@ class Compiler
         when PushIntInstruction
           @stack << LLVM::Int(instruction.value)
         when PushStrInstruction
-          # FIXME: don't always want a global string here probably
-          str = @module.globals.add(LLVM::ConstantArray.string(instruction.value), 'str') do |var|
-            var.initializer = LLVM::ConstantArray.string(instruction.value)
-          end
+          str = build_string(builder, instruction.value)
           @stack << str
         when PushTrueInstruction
           @stack << LLVM::TRUE
@@ -186,24 +184,59 @@ class Compiler
         when :int
           value.to_i
         when :str
-          value.to_ptr.read_pointer.read_string
-          #value.to_ptr.read_string
+          #     RC*    RC           RC.ptr
+          value.to_ptr.read_pointer.read_pointer.read_string
         else
           raise "Unknown type: #{type.inspect}"
         end
       end
 
-      def compile_puts(builder, arg)
-        case arg.type
-        when LLVM::IntType
+      def build_puts(builder, arg)
+        case arg.type.kind
+        when :integer
           builder.call(fn_puts_int, arg)
+        when :pointer # FIXME: need our own type information here
+          builder.call(fn_puts_str, arg)
         else
-          raise "Unhandled type: #{arg.class}"
+          raise "Unhandled type: #{arg.type}"
         end
+      end
+
+      def build_string(builder, value)
+        rc = builder.call(fn_rc_new)
+        str = LLVM::ConstantArray.string(value)
+        str_ptr = builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
+        builder.store(str, str_ptr)
+        builder.call(fn_rc_set_str, rc, str_ptr)
+        rc
+      end
+
+      def rc_struct
+        @rc_struct ||= LLVM::Struct(LLVM::Type.ptr, LLVM::UInt64)
       end
 
       def fn_puts_int
         @fn_puts_int ||= @module.functions.add('puts_int', [LLVM::Int32], LLVM::Int32)
+      end
+
+      def fn_puts_str
+        @fn_puts_str ||= @module.functions.add('puts_str', [LLVM::Type.pointer(rc_struct)], LLVM::Type.pointer(rc_struct))
+      end
+
+      def fn_rc_new
+        @fn_rc_new ||= @module.functions.add('rc_new', [], LLVM::Type.pointer(rc_struct))
+      end
+
+      def fn_rc_set_str
+        @fn_rc_set_str ||= @module.functions.add('rc_set_str', [LLVM::Type.pointer(rc_struct), LLVM::Type.pointer(LLVM::UInt8)], LLVM::Type.void)
+      end
+
+      def fn_rc_take
+        @fn_rc_take ||= @module.functions.add('rc_take', [LLVM::Type.pointer(rc_struct)], LLVM::Type.void)
+      end
+
+      def fn_rc_drop
+        @fn_rc_drop ||= @module.functions.add('rc_drop', [LLVM::Type.pointer(rc_struct)], LLVM::Type.void)
       end
     end
   end

@@ -16,7 +16,6 @@ code = if args.first == '-e'
 instructions = Compiler.new(code).compile
 
 if dump_ir
-  binding.irb
   pp instructions.map(&:to_h)
 end
 

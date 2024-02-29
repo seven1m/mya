@@ -7,7 +7,7 @@ task spec: :build do
 end
 
 task :watch do
-  files = Dir['**/*.rb']
+  files = Dir['**/*.rb', 'src/*.c']
   sh "ls #{files.join(' ')} | entr -c -s 'bundle exec rake spec'"
 end
 

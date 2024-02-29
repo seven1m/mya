@@ -311,6 +311,7 @@ class Compiler
         nth: FunctionType.new(array, IntType, array_type),
         push: FunctionType.new(array, array_type, array_type),
         puts: FunctionType.new(IntType, IntType),
+        puts_str: FunctionType.new(StrType, StrType),
       }
     end
   end
