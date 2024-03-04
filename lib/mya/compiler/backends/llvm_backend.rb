@@ -1,6 +1,8 @@
 require 'llvm/core'
 require 'llvm/execution_engine'
 require 'llvm/linker'
+require 'llvm/linker'
+require_relative 'llvm_backend/rc'
 
 class Compiler
   module Backends
@@ -16,7 +18,6 @@ class Compiler
         @methods = build_methods
         @dump = dump
         @lib = LLVM::Module.parse_ir(LIB_PATH)
-        @rc = LLVM::Struct(LLVM::Type.pointer, LLVM::Int32, 'rc')
       end
 
       attr_reader :instructions
@@ -96,7 +97,7 @@ class Compiler
         when SetVarInstruction
           value = @stack.pop
           variable = builder.alloca(value.type, "var_#{instruction.name}")
-          builder.store(value, variable)
+          store(builder, value, variable)
           vars[instruction.name] = variable
         when PushVarInstruction
           variable = vars.fetch(instruction.name)
@@ -156,6 +157,11 @@ class Compiler
         end
       end
 
+      def store(builder, value, variable)
+        value = value.is_a?(RC) ? value.ptr : value
+        builder.store(value, variable)
+      end
+
       def scope
         @scope_stack.last
       end
@@ -171,7 +177,7 @@ class Compiler
         when :int
           LLVM::Int32
         when :str, :'(int array)'
-          LLVM::Type.pointer(rc_struct)
+          RC.pointer_type
         else
           raise "Unknown type: #{type.inspect}"
         end
@@ -203,34 +209,25 @@ class Compiler
       end
 
       def build_string(builder, value)
-        rc = builder.call(fn_rc_new)
-        str = LLVM::ConstantArray.string(value)
-        str_ptr = builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
-        builder.store(str, str_ptr)
-        builder.call(fn_rc_set_str, rc, str_ptr)
-        rc
+        rc = RC.new(builder:, mod: @module)
+        rc.store_string(value)
+        rc.to_ptr
       end
 
       def build_array(builder, instruction)
-        rc = builder.call(fn_rc_new)
+        rc = RC.new(builder:, mod: @module)
 
         element_type = llvm_type(instruction.type.types.first.to_s)
         ary_ptr = builder.array_malloc(element_type.type, LLVM::Int(instruction.size))
-        builder.store(
-          ary_ptr,
-          builder.gep2(rc_struct, rc, [LLVM::Int(0), LLVM::Int(0)], '')
-        )
+        rc.store_ptr(ary_ptr)
 
         elements = @stack.pop(instruction.size)
         elements.each_with_index do |element, index|
           gep = builder.gep2(LLVM::Type.array(element_type), ary_ptr, [LLVM::Int(0), LLVM::Int(index)], '')
           builder.store(element, gep)
         end
-        rc
-      end
 
-      def rc_struct
-        @rc_struct ||= LLVM::Struct(LLVM::Type.ptr, LLVM::UInt64)
+        rc.to_ptr
       end
 
       def fn_puts_int
@@ -238,34 +235,15 @@ class Compiler
       end
 
       def fn_puts_str
-        @fn_puts_str ||= @module.functions.add('puts_str', [LLVM::Type.pointer(rc_struct)], LLVM::Int32)
-      end
-
-      def fn_rc_new
-        @fn_rc_new ||= @module.functions.add('rc_new', [], LLVM::Type.pointer(rc_struct))
-      end
-
-      def fn_rc_set_str
-        @fn_rc_set_str ||= @module.functions.add('rc_set_str', [LLVM::Type.pointer(rc_struct), LLVM::Type.pointer(LLVM::UInt8)], LLVM::Type.void)
-      end
-
-      def fn_rc_take
-        @fn_rc_take ||= @module.functions.add('rc_take', [LLVM::Type.pointer(rc_struct)], LLVM::Type.void)
-      end
-
-      def fn_rc_drop
-        @fn_rc_drop ||= @module.functions.add('rc_drop', [LLVM::Type.pointer(rc_struct)], LLVM::Type.void)
+        @fn_puts_str ||= @module.functions.add('puts_str', [RC.pointer_type], LLVM::Int32)
       end
 
       def build_methods
         {
           first: -> (builder:, instruction:, args:) do
-            rc = args.first
+            rc = RC.new(ptr: args.first, builder:, mod: @module)
             element_type = llvm_type(instruction.type!)
-            ary_ptr = builder.load2(
-              LLVM::Type.pointer(element_type),
-              builder.gep2(rc_struct, rc, [LLVM::Int(0), LLVM::Int(0)], '')
-            )
+            ary_ptr = rc.load_ptr(LLVM::Type.pointer(element_type))
             builder.load2(
               element_type,
               builder.gep(ary_ptr, [LLVM::Int(0)])
