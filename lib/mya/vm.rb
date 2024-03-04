@@ -40,7 +40,8 @@ class VM
     '*': nil,
     '/': nil,
     '==': nil,
-    'puts': ->(arg, io:) { io.puts(arg); arg.to_s.size }
+    'first': nil,
+    'puts': ->(arg, io:) { io.puts(arg); arg.to_s.size },
   }.freeze
 
   def execute(instruction)
@@ -55,6 +56,9 @@ class VM
       vars[instruction.name] = @stack.pop
     when Compiler::PushVarInstruction
       @stack << vars.fetch(instruction.name)
+    when Compiler::PushArrayInstruction
+      elements = @stack.pop(instruction.size)
+      @stack << elements
     when Compiler::DefInstruction
       @methods[instruction.name] = instruction
     when Compiler::CallInstruction
@@ -66,7 +70,8 @@ class VM
                     new_args.first.send(instruction.name, *new_args[1..])
                   end
       else
-        method = @methods.fetch(instruction.name)
+        method = @methods[instruction.name]
+        raise NoMethodError, "Undefined method #{instruction.name}" unless method
         push_frame(instructions: method.body, return_index: @index, with_scope: true)
         @scope_stack << { args: new_args, vars: {} }
       end

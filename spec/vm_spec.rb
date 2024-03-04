@@ -24,6 +24,14 @@ describe VM do
     expect(execute('a = 1; a')).must_equal(1)
   end
 
+  it 'evaluates arrays' do
+    code = <<~CODE
+      a = [1, 2, 3]
+      a.first
+    CODE
+    expect(execute(code)).must_equal(1)
+  end
+
   it 'evaluates method definitions' do
     code = <<~CODE
       def foo

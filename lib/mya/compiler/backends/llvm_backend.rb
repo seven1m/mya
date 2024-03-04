@@ -13,7 +13,7 @@ class Compiler
         @scope_stack = [{ vars: {} }]
         @call_stack = []
         @if_depth = 0
-        @methods = {}
+        @methods = build_methods
         @dump = dump
         @lib = LLVM::Module.parse_ir(LIB_PATH)
         @rc = LLVM::Struct(LLVM::Type.pointer, LLVM::Int32, 'rc')
@@ -69,12 +69,6 @@ class Compiler
         function.basic_blocks.append.build do |builder|
           build_instructions(function, builder, instructions) do |return_value|
             builder.ret return_value
-            #case function.return_type
-            #when :str
-              #builder.ret builder.gep(return_value, LLVM::Int(0))
-            #else
-              #builder.ret return_value
-            #end
           end
         end
         @scope_stack.pop
@@ -107,6 +101,8 @@ class Compiler
         when PushVarInstruction
           variable = vars.fetch(instruction.name)
           @stack << builder.load(variable)
+        when PushArrayInstruction
+          @stack << build_array(builder, instruction)
         when DefInstruction
           @index += 1
           name = instruction.name
@@ -114,7 +110,7 @@ class Compiler
             llvm_type(instruction.body.fetch(i * 2).type!)
           end
           return_type = llvm_type(instruction.return_type)
-          @methods[name] = fn  = @module.functions.add(name, param_types, return_type)
+          @methods[name] = fn = @module.functions.add(name, param_types, return_type)
           build_function(fn, instruction.body)
         when CallInstruction
           args = @stack.pop(instruction.arg_count)
@@ -122,8 +118,12 @@ class Compiler
             @stack << instance_exec(builder, *args, &built_in_method)
           else
             name = instruction.name
-            function = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
-            @stack << builder.call(function, *args)
+            fn = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
+            if fn.respond_to?(:call)
+              @stack << fn.call(builder:, instruction:, args:)
+            else
+              @stack << builder.call(fn, *args)
+            end
           end
         when PushArgInstruction
           function = @scope_stack.last.fetch(:function)
@@ -170,8 +170,8 @@ class Compiler
           LLVM::Int1
         when :int
           LLVM::Int32
-        when :str
-          LLVM::Type.pointer(LLVM::UInt8)
+        when :str, :'(int array)'
+          LLVM::Type.pointer(rc_struct)
         else
           raise "Unknown type: #{type.inspect}"
         end
@@ -211,6 +211,24 @@ class Compiler
         rc
       end
 
+      def build_array(builder, instruction)
+        rc = builder.call(fn_rc_new)
+
+        element_type = llvm_type(instruction.type.types.first.to_s)
+        ary_ptr = builder.array_malloc(element_type.type, LLVM::Int(instruction.size))
+        builder.store(
+          ary_ptr,
+          builder.gep2(rc_struct, rc, [LLVM::Int(0), LLVM::Int(0)], '')
+        )
+
+        elements = @stack.pop(instruction.size)
+        elements.each_with_index do |element, index|
+          gep = builder.gep2(LLVM::Type.array(element_type), ary_ptr, [LLVM::Int(0), LLVM::Int(index)], '')
+          builder.store(element, gep)
+        end
+        rc
+      end
+
       def rc_struct
         @rc_struct ||= LLVM::Struct(LLVM::Type.ptr, LLVM::UInt64)
       end
@@ -237,6 +255,31 @@ class Compiler
 
       def fn_rc_drop
         @fn_rc_drop ||= @module.functions.add('rc_drop', [LLVM::Type.pointer(rc_struct)], LLVM::Type.void)
+      end
+
+      def build_methods
+        {
+          first: -> (builder:, instruction:, args:) do
+            rc = args.first
+            element_type = llvm_type(instruction.type!)
+            ary_ptr = builder.load2(
+              LLVM::Type.pointer(element_type),
+              builder.gep2(rc_struct, rc, [LLVM::Int(0), LLVM::Int(0)], '')
+            )
+            builder.load2(
+              element_type,
+              builder.gep(ary_ptr, [LLVM::Int(0)])
+            )
+          end
+        }
+      end
+
+      # usage:
+      # diff(@module.functions[11].to_s, @module.functions[0].to_s)
+      def diff(expected, actual)
+        File.write("/tmp/actual.ll", actual)
+        File.write("/tmp/expected.ll", expected)
+        puts `diff -y -W 134 /tmp/expected.ll /tmp/actual.ll`
       end
     end
   end
