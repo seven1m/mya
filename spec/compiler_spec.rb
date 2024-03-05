@@ -52,8 +52,11 @@ describe Compiler do
       a.first
 
       b = []
-      b << 4
-      b << 5
+      b << "foo"
+      b << "bar"
+
+      c = [4, 5, 6]
+      d = [c, c]
     CODE
     expect(compile(code)).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },
@@ -63,15 +66,48 @@ describe Compiler do
       { type: '(int array)', instruction: :set_var, name: :a },
       { type: '(int array)', instruction: :push_var, name: :a },
       { type: 'int', instruction: :call, name: :first, arg_count: 1 },
-      { type: '(int array)', instruction: :push_array, size: 0 },
-      { type: '(int array)', instruction: :set_var, name: :b },
-      { type: '(int array)', instruction: :push_var, name: :b },
+      { type: '(str array)', instruction: :push_array, size: 0 },
+      { type: '(str array)', instruction: :set_var, name: :b },
+      { type: '(str array)', instruction: :push_var, name: :b },
+      { type: 'str', instruction: :push_str, value: "foo" },
+      { type: '(str array)', instruction: :call, name: :<<, arg_count: 2, },
+      { type: '(str array)', instruction: :push_var, name: :b },
+      { type: 'str', instruction: :push_str, value: "bar" },
+      { type: '(str array)', instruction: :call, name: :<<, arg_count: 2, },
       { type: 'int', instruction: :push_int, value: 4 },
-      { type: '(int array)', instruction: :call, name: :<<, arg_count: 2, },
-      { type: '(int array)', instruction: :push_var, name: :b },
       { type: 'int', instruction: :push_int, value: 5 },
-      { type: '(int array)', instruction: :call, name: :<<, arg_count: 2, },
+      { type: 'int', instruction: :push_int, value: 6 },
+      { type: '(int array)', instruction: :push_array, size: 3 },
+      { type: '(int array)', instruction: :set_var, name: :c },
+      { type: '(int array)', instruction: :push_var, name: :c },
+      { type: '(int array)', instruction: :push_var, name: :c },
+      { type: '((int array) array)', instruction: :push_array, size: 2 },
+      { type: '((int array) array)', instruction: :set_var, name: :d },
     ]
+  end
+
+  it 'raises an error if the array elements do not have the same type' do
+    code = <<~CODE
+      [1, "foo"]
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'the array contains type int but you are trying to push type str'
+
+    code = <<~CODE
+      a = [1]
+      a << "foo"
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal '([(a array), a] -> (a array)) cannot unify with ([(int array), str] -> b) in call to <<'
+
+    code = <<~CODE
+      [
+        [1, 2, 3],
+        ['foo', 'bar', 'baz']
+      ]
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'the array contains type (int array) but you are trying to push type (str array)'
   end
 
   it 'compiles method definitions' do
@@ -182,8 +218,8 @@ describe Compiler do
   # NOTE: we don't support monomorphization (yet!)
   it 'raises an error if the method arg has more than one type' do
     code = <<~CODE
-      def foo(a)
-        a
+      def foo(x)
+        x
       end
 
       foo(1)
@@ -191,13 +227,13 @@ describe Compiler do
       foo('bar')
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal 'int cannot unify with str in call to foo'
+    expect(e.message).must_equal '([int] -> int) cannot unify with ([str] -> a) in call to foo'
   end
 
   it 'raises an error if the arg count of method and call do not match' do
     code = <<~CODE
-      def foo(a)
-        a
+      def foo(x)
+        x
       end
 
       foo(1, 2)

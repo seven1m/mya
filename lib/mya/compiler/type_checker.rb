@@ -213,7 +213,7 @@ class Compiler
       when PushArrayInstruction
         members = @stack.pop(exp.size)
         members.each_cons(2) do |a, b|
-          unify_type(a, b)
+          unify_type(a, b, exp)
         end
         member_type = members.first || TypeVariable.new(self)
         non_generic_vars << member_type
@@ -281,7 +281,11 @@ class Compiler
           if a.name == 'union' && (matching = a.types.detect { |t| t.name == b.name && t.types.size == b.types.size })
             unify_type(matching, b, instruction)
           elsif a.name == b.name && a.types.size == b.types.size
-            unify_args(a.types, b.types, instruction)
+            begin
+              unify_args(a.types, b.types, instruction)
+            rescue TypeClash
+              raise_type_clash_error(a, b, instruction)
+            end
           else
             raise_type_clash_error(a, b, instruction)
           end
@@ -307,6 +311,8 @@ class Compiler
         "one branch of `if` has type #{a} and the other has type #{b}"
       when SetVarInstruction
         "the variable #{instruction.name} has type #{a} already; you cannot change it to type #{b}"
+      when PushArrayInstruction
+        "the array contains type #{a} but you are trying to push type #{b}"
       else
         "#{a} cannot unify with #{b} #{instruction.inspect}"
       end
