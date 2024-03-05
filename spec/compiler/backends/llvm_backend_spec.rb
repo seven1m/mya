@@ -38,6 +38,22 @@ describe Compiler::Backends::LLVMBackend do
     expect(execute(code)).must_equal(3)
 
     code = <<~CODE
+      a = []
+      a << 4
+      a << 5
+      a.last
+    CODE
+    expect(execute(code)).must_equal(5)
+
+    code = <<~CODE
+      a = []
+      a << "foo"
+      a << "bar"
+      a.last
+    CODE
+    expect(execute(code)).must_equal("bar")
+
+    code = <<~CODE
       a = ["foo", "bar", "baz"]
       a.first
     CODE

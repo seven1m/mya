@@ -40,6 +40,14 @@ class Compiler
           @builder.call(fn, @ptr)
         end
 
+        def push(value)
+          fn_name = "array_push_#{type_name}"
+          unless (fn = @module.functions[fn_name])
+            fn = @module.functions.add(fn_name, [RcBuilder.pointer_type, @element_type], RcBuilder.pointer_type)
+          end
+          @builder.call(fn, @ptr, value)
+        end
+
         private
 
         def type_name

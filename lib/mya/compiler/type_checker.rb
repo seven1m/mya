@@ -328,6 +328,7 @@ class Compiler
         nth: FunctionType.new(array, IntType, array_type),
         first: FunctionType.new(array, array_type),
         last: FunctionType.new(array, array_type),
+        '<<': FunctionType.new(array, array_type, array),
         push: FunctionType.new(array, array_type, array_type),
         puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
       }

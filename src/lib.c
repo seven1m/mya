@@ -58,6 +58,22 @@ RC *array_last_pointer(RC *rc) {
     return ary[rc->size - 1];
 }
 
+RC *array_push_integer(RC *rc, int32_t value) {
+    int32_t *ary = rc->ptr;
+    rc->size++;
+    ary = rc->ptr = realloc(ary, sizeof(int32_t) * rc->size);
+    ary[rc->size - 1] = value;
+    return rc;
+}
+
+RC *array_push_pointer(RC *rc, RC *value) {
+    RC **ary = rc->ptr;
+    rc->size++;
+    ary = rc->ptr = realloc(ary, sizeof(RC *) * rc->size);
+    ary[rc->size - 1] = value;
+    return rc;
+}
+
 int32_t puts_int(int32_t i) {
     return printf("%d\n", i);
 }

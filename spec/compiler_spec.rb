@@ -50,6 +50,10 @@ describe Compiler do
     code = <<~CODE
       a = [1, 2, 3]
       a.first
+
+      b = []
+      b << 4
+      b << 5
     CODE
     expect(compile(code)).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },
@@ -59,6 +63,14 @@ describe Compiler do
       { type: '(int array)', instruction: :set_var, name: :a },
       { type: '(int array)', instruction: :push_var, name: :a },
       { type: 'int', instruction: :call, name: :first, arg_count: 1 },
+      { type: '(int array)', instruction: :push_array, size: 0 },
+      { type: '(int array)', instruction: :set_var, name: :b },
+      { type: '(int array)', instruction: :push_var, name: :b },
+      { type: 'int', instruction: :push_int, value: 4 },
+      { type: '(int array)', instruction: :call, name: :<<, arg_count: 2, },
+      { type: '(int array)', instruction: :push_var, name: :b },
+      { type: 'int', instruction: :push_int, value: 5 },
+      { type: '(int array)', instruction: :call, name: :<<, arg_count: 2, },
     ]
   end
 

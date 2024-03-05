@@ -24,6 +24,9 @@ class Compiler
       @pruned_type.to_s
     end
 
+    # FIXME: need better way to get type info
+    attr_reader :pruned_type
+
     def inspect
       "<#{self.class.name} #{instance_variables.map { |iv| "#{iv}=#{instance_variable_get(iv).inspect}" }.join(' ')}>"
     end
