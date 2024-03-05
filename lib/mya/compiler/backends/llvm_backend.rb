@@ -169,9 +169,9 @@ class Compiler
       def llvm_type(type)
         case type.to_sym
         when :bool
-          LLVM::Int1
+          LLVM::Int1.type
         when :int
-          LLVM::Int32
+          LLVM::Int32.type
         when :str, :'(int array)'
           RcBuilder.pointer_type
         else

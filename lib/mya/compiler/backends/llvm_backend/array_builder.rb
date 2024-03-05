@@ -7,7 +7,7 @@ class Compiler
           @element_type = element_type
 
           unless ptr
-            ary_ptr = builder.array_malloc(element_type.type, LLVM::Int(elements.size))
+            ary_ptr = builder.array_malloc(element_type, LLVM::Int(elements.size))
             store_ptr(ary_ptr)
 
             elements.each_with_index do |element, index|
@@ -43,7 +43,7 @@ class Compiler
         private
 
         def type_name
-          @element_type.name.split('::').last.downcase
+          @element_type.kind
         end
 
         def load_ary_ptr

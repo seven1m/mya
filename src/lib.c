@@ -26,7 +26,7 @@ void rc_drop(RC *rc) {
     }
 }
 
-int32_t array_first_int32(RC *rc) {
+int32_t array_first_integer(RC *rc) {
     if (rc->size == 0) {
         return 0; // FIXME
     }
@@ -34,11 +34,27 @@ int32_t array_first_int32(RC *rc) {
     return ary[0];
 }
 
-int32_t array_last_int32(RC *rc) {
+RC *array_first_pointer(RC *rc) {
+    if (rc->size == 0) {
+        return 0; // FIXME
+    }
+    RC **ary = rc->ptr;
+    return ary[0];
+}
+
+int32_t array_last_integer(RC *rc) {
     if (rc->size == 0) {
         return 0; // FIXME
     }
     int32_t *ary = rc->ptr;
+    return ary[rc->size - 1];
+}
+
+RC *array_last_pointer(RC *rc) {
+    if (rc->size == 0) {
+        return 0; // FIXME
+    }
+    RC **ary = rc->ptr;
     return ary[rc->size - 1];
 }
 
