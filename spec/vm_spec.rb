@@ -30,6 +30,12 @@ describe VM do
       a.first
     CODE
     expect(execute(code)).must_equal(1)
+
+    code = <<~CODE
+      a = [1, 2, 3]
+      a.last
+    CODE
+    expect(execute(code)).must_equal(3)
   end
 
   it 'evaluates method definitions' do

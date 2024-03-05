@@ -135,11 +135,6 @@ class Compiler
       case exp
       when Array
         last_type = nil
-        # FIXME: I think there's a bug here.
-        # Do we lose type information for the first N-1 instructions?
-        # Well, kind of.
-        # Everything gets analyzed, which is great. But not every type
-        # gets pruned!
         exp.each do |e|
           last_type = analyze_exp(e, env, non_generic_vars)
         end
@@ -332,6 +327,7 @@ class Compiler
         "/": FunctionType.new(IntType, IntType, IntType),
         nth: FunctionType.new(array, IntType, array_type),
         first: FunctionType.new(array, array_type),
+        last: FunctionType.new(array, array_type),
         push: FunctionType.new(array, array_type, array_type),
         puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
       }

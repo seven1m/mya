@@ -5,6 +5,8 @@ GEM
     builder (3.2.4)
     ffi (1.16.3)
     minitest (5.21.2)
+    minitest-fail-fast (0.1.0)
+      minitest (~> 5)
     minitest-focus (1.4.0)
       minitest (>= 4, < 6)
     minitest-reporters (1.6.1)
@@ -26,6 +28,7 @@ PLATFORMS
 
 DEPENDENCIES
   minitest
+  minitest-fail-fast
   minitest-focus
   minitest-reporters
   prism

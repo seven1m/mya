@@ -2,7 +2,8 @@ require 'llvm/core'
 require 'llvm/execution_engine'
 require 'llvm/linker'
 require 'llvm/linker'
-require_relative 'llvm_backend/rc'
+require_relative 'llvm_backend/rc_builder'
+require_relative 'llvm_backend/array_builder'
 
 class Compiler
   module Backends
@@ -97,7 +98,7 @@ class Compiler
         when SetVarInstruction
           value = @stack.pop
           variable = builder.alloca(value.type, "var_#{instruction.name}")
-          store(builder, value, variable)
+          builder.store(value, variable)
           vars[instruction.name] = variable
         when PushVarInstruction
           variable = vars.fetch(instruction.name)
@@ -157,11 +158,6 @@ class Compiler
         end
       end
 
-      def store(builder, value, variable)
-        value = value.is_a?(RC) ? value.ptr : value
-        builder.store(value, variable)
-      end
-
       def scope
         @scope_stack.last
       end
@@ -177,7 +173,7 @@ class Compiler
         when :int
           LLVM::Int32
         when :str, :'(int array)'
-          RC.pointer_type
+          RcBuilder.pointer_type
         else
           raise "Unknown type: #{type.inspect}"
         end
@@ -209,25 +205,16 @@ class Compiler
       end
 
       def build_string(builder, value)
-        rc = RC.new(builder:, mod: @module)
+        rc = RcBuilder.new(builder:, mod: @module)
         rc.store_string(value)
         rc.to_ptr
       end
 
       def build_array(builder, instruction)
-        rc = RC.new(builder:, mod: @module)
-
-        element_type = llvm_type(instruction.type.types.first.to_s)
-        ary_ptr = builder.array_malloc(element_type.type, LLVM::Int(instruction.size))
-        rc.store_ptr(ary_ptr)
-
         elements = @stack.pop(instruction.size)
-        elements.each_with_index do |element, index|
-          gep = builder.gep2(LLVM::Type.array(element_type), ary_ptr, [LLVM::Int(0), LLVM::Int(index)], '')
-          builder.store(element, gep)
-        end
-
-        rc.to_ptr
+        element_type = llvm_type(instruction.type.types.first.to_s)
+        array = ArrayBuilder.new(builder:, mod: @module, element_type:, elements:)
+        array.to_ptr
       end
 
       def fn_puts_int
@@ -235,19 +222,20 @@ class Compiler
       end
 
       def fn_puts_str
-        @fn_puts_str ||= @module.functions.add('puts_str', [RC.pointer_type], LLVM::Int32)
+        @fn_puts_str ||= @module.functions.add('puts_str', [RcBuilder.pointer_type], LLVM::Int32)
       end
 
       def build_methods
         {
           first: -> (builder:, instruction:, args:) do
-            rc = RC.new(ptr: args.first, builder:, mod: @module)
             element_type = llvm_type(instruction.type!)
-            ary_ptr = rc.load_ptr(LLVM::Type.pointer(element_type))
-            builder.load2(
-              element_type,
-              builder.gep(ary_ptr, [LLVM::Int(0)])
-            )
+            array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
+            array.first
+          end,
+          last: -> (builder:, instruction:, args:) do
+            element_type = llvm_type(instruction.type!)
+            array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
+            array.last
           end
         }
       end

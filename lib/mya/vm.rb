@@ -41,6 +41,7 @@ class VM
     '/': nil,
     '==': nil,
     'first': nil,
+    'last': nil,
     'puts': ->(arg, io:) { io.puts(arg); arg.to_s.size },
   }.freeze
 
