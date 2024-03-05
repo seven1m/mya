@@ -23,14 +23,6 @@ class Compiler
           @builder.store(ptr, field(0))
         end
 
-        def store_string(string)
-          str = LLVM::ConstantArray.string(string)
-          str_ptr = @builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
-          @builder.store(str, str_ptr)
-          @builder.call(fn_rc_set_str, @ptr, str_ptr, LLVM::Int(string.bytesize))
-          store_size(string.bytesize)
-        end
-
         def load_ptr(ptr_type)
           @builder.load2(ptr_type, field(0))
         end
@@ -60,13 +52,6 @@ class Compiler
         end
 
         private
-
-        def fn_rc_set_str
-          return @fn_rc_set_str if @fn_rc_set_str
-
-          @fn_rc_set_str = @module.functions['rc_set_str'] ||
-            @module.functions.add('rc_set_str', [pointer_type, LLVM::Type.pointer(LLVM::UInt8), LLVM::UInt32], LLVM::Type.void)
-        end
 
         def fn_rc_take
           @fn_rc_take ||= @module.functions.add('rc_take', [pointer_type], LLVM::Type.void)

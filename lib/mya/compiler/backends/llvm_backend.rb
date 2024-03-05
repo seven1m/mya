@@ -4,6 +4,7 @@ require 'llvm/linker'
 require 'llvm/linker'
 require_relative 'llvm_backend/rc_builder'
 require_relative 'llvm_backend/array_builder'
+require_relative 'llvm_backend/string_builder'
 
 class Compiler
   module Backends
@@ -78,6 +79,7 @@ class Compiler
 
       def build_instructions(function, builder, instructions)
         instructions.each do |instruction|
+          # FIXME: discard unused stack values
           build(instruction, function, builder)
         end
         return_value = @stack.pop
@@ -89,8 +91,7 @@ class Compiler
         when PushIntInstruction
           @stack << LLVM::Int(instruction.value)
         when PushStrInstruction
-          str = build_string(builder, instruction.value)
-          @stack << str
+          @stack << build_string(builder, instruction.value)
         when PushTrueInstruction
           @stack << LLVM::TRUE
         when PushFalseInstruction
@@ -205,9 +206,8 @@ class Compiler
       end
 
       def build_string(builder, value)
-        rc = RcBuilder.new(builder:, mod: @module)
-        rc.store_string(value)
-        rc.to_ptr
+        string = StringBuilder.new(builder:, mod: @module, string: value)
+        string.to_ptr
       end
 
       def build_array(builder, instruction)
