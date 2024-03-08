@@ -25,7 +25,7 @@ describe Compiler do
   it 'compiles variables set and get' do
     expect(compile('a = 1; a')).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: 'int', instruction: :set_var, name: :a },
+      { type: 'int', instruction: :set_var, name: :a, nillable: false },
       { type: 'int', instruction: :push_var, name: :a }
     ]
   end
@@ -33,9 +33,9 @@ describe Compiler do
   it 'can set a variable more than once' do
     expect(compile('a = 1; a = 2')).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: 'int', instruction: :set_var, name: :a },
+      { type: 'int', instruction: :set_var, name: :a, nillable: false },
       { type: 'int', instruction: :push_int, value: 2 },
-      { type: 'int', instruction: :set_var, name: :a }
+      { type: 'int', instruction: :set_var, name: :a, nillable: false }
     ]
   end
 
@@ -63,11 +63,11 @@ describe Compiler do
       { type: 'int', instruction: :push_int, value: 2 },
       { type: 'int', instruction: :push_int, value: 3 },
       { type: '(int array)', instruction: :push_array, size: 3 },
-      { type: '(int array)', instruction: :set_var, name: :a },
+      { type: '(int array)', instruction: :set_var, name: :a, nillable: false },
       { type: '(int array)', instruction: :push_var, name: :a },
       { type: 'int', instruction: :call, name: :first, arg_count: 1 },
       { type: '(str array)', instruction: :push_array, size: 0 },
-      { type: '(str array)', instruction: :set_var, name: :b },
+      { type: '(str array)', instruction: :set_var, name: :b, nillable: false },
       { type: '(str array)', instruction: :push_var, name: :b },
       { type: 'str', instruction: :push_str, value: "foo" },
       { type: '(str array)', instruction: :call, name: :<<, arg_count: 2, },
@@ -78,11 +78,11 @@ describe Compiler do
       { type: 'int', instruction: :push_int, value: 5 },
       { type: 'int', instruction: :push_int, value: 6 },
       { type: '(int array)', instruction: :push_array, size: 3 },
-      { type: '(int array)', instruction: :set_var, name: :c },
+      { type: '(int array)', instruction: :set_var, name: :c, nillable: false },
       { type: '(int array)', instruction: :push_var, name: :c },
       { type: '(int array)', instruction: :push_var, name: :c },
       { type: '((int array) array)', instruction: :push_array, size: 2 },
-      { type: '((int array) array)', instruction: :set_var, name: :d },
+      { type: '((int array) array)', instruction: :set_var, name: :d, nillable: false },
     ]
   end
 
@@ -177,7 +177,7 @@ describe Compiler do
         params: [:a],
         body: [
           { type: 'int', instruction: :push_arg, index: 0 },
-          { type: 'int', instruction: :set_var, name: :a },
+          { type: 'int', instruction: :set_var, name: :a, nillable: false },
           { type: 'int', instruction: :push_var, name: :a },
         ]
       },
@@ -189,9 +189,9 @@ describe Compiler do
         params: [:a, :b],
         body: [
           { type: 'str', instruction: :push_arg, index: 0 },
-          { type: 'str', instruction: :set_var, name: :a },
+          { type: 'str', instruction: :set_var, name: :a, nillable: false },
           { type: 'int', instruction: :push_arg, index: 1 },
-          { type: 'int', instruction: :set_var, name: :b },
+          { type: 'int', instruction: :set_var, name: :b, nillable: false },
           { type: 'str', instruction: :push_var, name: :a },
         ]
       },
@@ -304,6 +304,77 @@ describe Compiler do
     ]
   end
 
+  it 'raises an error if a variable is changed to nil' do
+    e = expect { compile('a = "foo"; a = nil') }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'the variable a has type str already; you cannot change it to type nil'
+
+    e = expect { compile('a = ["foo"]; a << nil') }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal '([(a array), a] -> (a array)) cannot unify with ([(str array), nil] -> b) in call to <<'
+  end
+
+  it 'allows assignment of nil when the variable is named with the suffix "_or_nil"' do
+    code = <<~CODE
+      a_or_nil = "foo"
+      a_or_nil = nil
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: 'str', instruction: :push_str, value: 'foo' },
+      { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
+      { type: 'nil', instruction: :push_nil },
+      { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
+    ]
+
+    code = <<~CODE
+      a_or_nil = nil
+      a_or_nil = "foo"
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: 'nil', instruction: :push_nil },
+      { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
+      { type: 'str', instruction: :push_str, value: 'foo' },
+      { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
+    ]
+  end
+
+  it 'allows assignment of nil when the variable is marked with the special "nillable" comment' do
+    code = <<~CODE
+      a = "foo" # a:nillable
+      a = nil
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: 'str', instruction: :push_str, value: 'foo' },
+      { type: '(nillable str)', instruction: :set_var, name: :a, nillable: true },
+      { type: 'nil', instruction: :push_nil },
+      { type: '(nillable str)', instruction: :set_var, name: :a, nillable: false },
+    ]
+  end
+
+  it 'allows assignment of nil when the variable is first set to nil and changed to something else' do
+    code = <<~CODE
+      a = nil
+      a = "foo"
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: 'nil', instruction: :push_nil },
+      { type: '(nillable str)', instruction: :set_var, name: :a, nillable: false },
+      { type: 'str', instruction: :push_str, value: 'foo' },
+      { type: '(nillable str)', instruction: :set_var, name: :a, nillable: false },
+    ]
+  end
+
+  it 'raises an error if a method returns nil and is assigned to a variable' do
+    code = <<~CODE
+      def foo
+        nil
+      end
+
+      a = foo
+      a = "bar"
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'the variable a has type nil already; you cannot change it to type str'
+  end
+
   it 'compiles examples/fib.rb' do
     code = File.read(File.expand_path('../examples/fib.rb', __dir__))
     expect(compile(code)).must_equal_with_diff [
@@ -314,7 +385,7 @@ describe Compiler do
         params: [:n],
         body: [
           { type: 'int', instruction: :push_arg, index: 0 },
-          { type: 'int', instruction: :set_var, name: :n },
+          { type: 'int', instruction: :set_var, name: :n, nillable: false },
           { type: 'int', instruction: :push_var, name: :n },
           { type: 'int', instruction: :push_int, value: 0 },
           { type: 'bool', instruction: :call, name: :==, arg_count: 2 },
@@ -367,9 +438,9 @@ describe Compiler do
         params: [:n, :result],
         body: [
           { type: 'int', instruction: :push_arg, index: 0 },
-          { type: 'int', instruction: :set_var, name: :n },
+          { type: 'int', instruction: :set_var, name: :n, nillable: false },
           { type: 'int', instruction: :push_arg, index: 1 },
-          { type: 'int', instruction: :set_var, name: :result },
+          { type: 'int', instruction: :set_var, name: :result, nillable: false },
           { type: 'int', instruction: :push_var, name: :n },
           { type: 'int', instruction: :push_int, value: 0 },
           { type: 'bool', instruction: :call, name: :==, arg_count: 2 },

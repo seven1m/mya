@@ -92,6 +92,19 @@ class Compiler
     end
   end
 
+  class PushNilInstruction < Instruction
+    def initialize(line:)
+      super(line:)
+    end
+
+    def to_h
+      {
+        type: type!,
+        instruction: :push_nil,
+      }
+    end
+  end
+
   class PushArrayInstruction < Instruction
     def initialize(size, line:)
       super(line:)
@@ -127,18 +140,22 @@ class Compiler
   end
 
   class SetVarInstruction < Instruction
-    def initialize(name, line:)
+    def initialize(name, nillable:, line:)
       super(line:)
       @name = name
+      @nillable = nillable
     end
 
     attr_reader :name
+
+    def nillable? = @nillable
 
     def to_h
       {
         type: type!,
         instruction: :set_var,
         name:,
+        nillable: nillable?,
       }
     end
   end

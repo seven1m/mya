@@ -7,7 +7,19 @@ require_relative './compiler/backends/llvm_backend'
 class Compiler
   def initialize(code)
     @code = code
-    @ast = Prism.parse(code).value
+    @result = Prism.parse(code)
+    @ast = @result.value
+    @directives = @result.comments.each_with_object({}) do |comment, directives|
+      text = comment.location.slice
+      text.split.each do |directive|
+        if directive =~ /^([a-z][a-z_]*):([a-z_]+)$/
+          line = comment.location.start_line
+          directives[line] ||= {}
+          directives[line][$1.to_sym] ||= []
+          directives[line][$1.to_sym] << $2.to_sym
+        end
+      end
+    end
   end
 
   def compile
@@ -41,13 +53,19 @@ class Compiler
       instruction = PushFalseInstruction.new(line: node.location.start_line)
       instructions << instruction
       instruction
+    when Prism::NilNode
+      instruction = PushNilInstruction.new(line: node.location.start_line)
+      instructions << instruction
+      instruction
     when Prism::StatementsNode
       node.body.map do |n|
         transform(n, instructions)
       end.last
     when Prism::LocalVariableWriteNode
       value_instruction = transform(node.value, instructions)
-      instruction = SetVarInstruction.new(node.name, line: node.location.start_line)
+      directives = @directives.dig(node.location.start_line, node.name) || []
+      nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
+      instruction = SetVarInstruction.new(node.name, nillable:, line: node.location.start_line)
       instructions << instruction
       instruction
     when Prism::LocalVariableReadNode
@@ -63,7 +81,7 @@ class Compiler
       params.each_with_index do |param, index|
         i1 = PushArgInstruction.new(index, line: node.location.start_line)
         def_instructions << i1
-        i2 = SetVarInstruction.new(param.name, line: node.location.start_line)
+        i2 = SetVarInstruction.new(param.name, nillable: false, line: node.location.start_line)
         def_instructions << i2
         instruction.params << param.name
       end

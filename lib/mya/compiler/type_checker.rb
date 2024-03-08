@@ -24,7 +24,7 @@ class Compiler
     def prune
       return self if @instance.nil?
 
-      @instance = instance.prune
+      @instance = @instance.prune
     end
   end
 
@@ -94,8 +94,19 @@ class Compiler
     end
   end
 
+  class NillableType < TypeOperator
+    def initialize(type)
+      super('nillable', [type])
+    end
+
+    def to_s
+      "(nillable #{types[0]})"
+    end
+  end
+
   IntType = TypeOperator.new('int', [])
   StrType = TypeOperator.new('str', [])
+  NilType = TypeOperator.new('nil', [])
   BoolType = TypeOperator.new('bool', [])
 
   class TypeChecker
@@ -148,13 +159,20 @@ class Compiler
       when PushTrueInstruction, PushFalseInstruction
         @stack << BoolType
         exp.type = BoolType
+      when PushNilInstruction
+        @stack << NilType
+        exp.type = NilType
       when SetVarInstruction
         type = @stack.pop
         if (existing_type = env[exp.name])
           unify_type(existing_type, type, exp)
-        else
-          env[exp.name] = type
+          type = existing_type
+        elsif type == NilType
+          type = NillableType.new(TypeVariable.new(self))
+        elsif exp.nillable?
+          type = NillableType.new(type)
         end
+        env[exp.name] = type
         exp.type = type
       when PushVarInstruction
         type = retrieve_type(exp.name, env, non_generic_vars)
@@ -280,6 +298,14 @@ class Compiler
         when TypeOperator
           if a.name == 'union' && (matching = a.types.detect { |t| t.name == b.name && t.types.size == b.types.size })
             unify_type(matching, b, instruction)
+          elsif a.name == 'nillable'
+            if b.name == 'nil'
+              # noop
+            elsif a.types.first.is_a?(TypeVariable)
+              unify_type(a.types.first, b)
+            else
+              raise_type_clash_error(a, b, instruction)
+            end
           elsif a.name == b.name && a.types.size == b.types.size
             begin
               unify_args(a.types, b.types, instruction)
