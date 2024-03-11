@@ -218,9 +218,8 @@ class Compiler
 
       def build_array(builder, instruction)
         elements = @stack.pop(instruction.size)
-        # FIXME: need simpler way to get the type info I need
-        instruction.type!
-        element_type = llvm_type(instruction.pruned_type.types.first.to_s)
+        array_type = instruction.type!
+        element_type = llvm_type(array_type.types.first.to_s)
         array = ArrayBuilder.new(builder:, mod: @module, element_type:, elements:)
         array.to_ptr
       end

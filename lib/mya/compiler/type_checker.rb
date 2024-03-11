@@ -17,6 +17,10 @@ class Compiler
       name.to_s
     end
 
+    def to_sym
+      name.to_sym
+    end
+
     def inspect
       "TypeVariable(id = #{id})"
     end
@@ -45,6 +49,10 @@ class Compiler
       else
         "#{name} #{types.join(' ')}"
       end
+    end
+
+    def to_sym
+      to_s.to_sym
     end
 
     def inspect
@@ -176,7 +184,7 @@ class Compiler
         exp.type = type
       when PushVarInstruction
         type = retrieve_type(exp.name, env, non_generic_vars)
-        raise UndefinedSymbol, "undefined symbol #{exp.name}" unless type
+        raise UndefinedSymbol, "undefined symbol #{exp.name.inspect}" unless type
         @stack << type
         exp.type = type
       when PushArgInstruction

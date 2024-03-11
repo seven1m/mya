@@ -21,14 +21,17 @@ class Compiler
       raise TypeError, "Not enough information to infer type of #{inspect}" if pruned.is_a?(TypeVariable)
 
       @pruned_type = pruned
-      @pruned_type.to_s
     end
-
-    # FIXME: need better way to get type info
-    attr_reader :pruned_type
 
     def inspect
       "<#{self.class.name} #{instance_variables.map { |iv| "#{iv}=#{instance_variable_get(iv).inspect}" }.join(' ')}>"
+    end
+
+    def to_h
+      {
+        type: type!.to_s,
+        instruction: instruction_name,
+      }
     end
   end
 
@@ -40,12 +43,12 @@ class Compiler
 
     attr_reader :value
 
+    def instruction_name
+      :push_int
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :push_int,
-        value:,
-      }
+      super.merge(value:)
     end
   end
 
@@ -57,12 +60,12 @@ class Compiler
 
     attr_reader :value
 
+    def instruction_name
+      :push_str
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :push_str,
-        value:,
-      }
+      super.merge(value:)
     end
   end
 
@@ -71,11 +74,8 @@ class Compiler
       super(line:)
     end
 
-    def to_h
-      {
-        type: type!,
-        instruction: :push_true,
-      }
+    def instruction_name
+      :push_true
     end
   end
 
@@ -84,11 +84,8 @@ class Compiler
       super(line:)
     end
 
-    def to_h
-      {
-        type: type!,
-        instruction: :push_false,
-      }
+    def instruction_name
+      :push_false
     end
   end
 
@@ -97,11 +94,8 @@ class Compiler
       super(line:)
     end
 
-    def to_h
-      {
-        type: type!,
-        instruction: :push_nil,
-      }
+    def instruction_name
+      :push_nil
     end
   end
 
@@ -113,12 +107,12 @@ class Compiler
 
     attr_reader :size
 
+    def instruction_name
+      :push_array
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :push_array,
-        size:
-      }
+      super.merge(size:)
     end
   end
 
@@ -130,12 +124,12 @@ class Compiler
 
     attr_reader :name
 
+    def instruction_name
+      :push_var
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :push_var,
-        name:,
-      }
+      super.merge(name:)
     end
   end
 
@@ -150,13 +144,12 @@ class Compiler
 
     def nillable? = @nillable
 
+    def instruction_name
+      :set_var
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :set_var,
-        name:,
-        nillable: nillable?,
-      }
+      super.merge(name:, nillable: nillable?)
     end
   end
 
@@ -168,12 +161,12 @@ class Compiler
 
     attr_reader :index
 
+    def instruction_name
+      :push_arg
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :push_arg,
-        index:,
-      }
+      super.merge(index:)
     end
   end
 
@@ -186,13 +179,12 @@ class Compiler
 
     attr_reader :name, :arg_count
 
+    def instruction_name
+      :call
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :call,
-        name:,
-        arg_count:,
-      }
+      super.merge(name:, arg_count:)
     end
   end
 
@@ -203,13 +195,15 @@ class Compiler
 
     attr_accessor :if_true, :if_false
 
+    def instruction_name
+      :if
+    end
+
     def to_h
-      {
-        type: type!,
-        instruction: :if,
+      super.merge(
         if_true: if_true.map(&:to_h),
         if_false: if_false.map(&:to_h)
-      }
+      )
     end
   end
 
@@ -223,18 +217,20 @@ class Compiler
     attr_reader :name
     attr_accessor :body, :params
 
+    def instruction_name
+      :def
+    end
+
     def return_type
       (@pruned_type || @type.prune).types.last.name.to_sym
     end
 
     def to_h
-      {
-        type: type!,
-        instruction: :def,
+      super.merge(
         name:,
         params:,
         body: body.map(&:to_h)
-      }
+      )
     end
   end
 end
