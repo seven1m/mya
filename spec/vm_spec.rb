@@ -15,6 +15,10 @@ describe VM do
     expect(execute('"foo"')).must_equal('foo')
   end
 
+  it 'evaluates nil' do
+    expect(execute('nil')).must_equal(nil)
+  end
+
   it 'evaluates booleans' do
     expect(execute('true')).must_equal(true)
     expect(execute('false')).must_equal(false)

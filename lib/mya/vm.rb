@@ -50,6 +50,8 @@ class VM
     case instruction
     when Compiler::PushIntInstruction, Compiler::PushStrInstruction
       @stack << instruction.value
+    when Compiler::PushNilInstruction
+      @stack << nil
     when Compiler::PushTrueInstruction
       @stack << true
     when Compiler::PushFalseInstruction
