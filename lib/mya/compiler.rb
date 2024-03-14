@@ -24,7 +24,6 @@ class Compiler
 
   def compile
     @scope_stack = [{ vars: {} }]
-    @calls = Hash.new { |h, k| h[k] = [] }
     @instructions = []
     transform(@ast, @instructions)
     type_check
@@ -95,8 +94,7 @@ class Compiler
       arg_instructions = args.map do |arg|
         transform(arg, instructions)
       end
-      @calls[node.name] << { args: arg_instructions }
-      instruction = CallInstruction.new(node.name, arg_count: args.size, line: node.location.start_line)
+      instruction = CallInstruction.new(node.name, arg_count: args.size, arg_instructions:, line: node.location.start_line)
       instructions << instruction
       instruction
     when Prism::IfNode

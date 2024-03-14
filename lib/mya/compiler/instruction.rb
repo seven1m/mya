@@ -171,13 +171,14 @@ class Compiler
   end
 
   class CallInstruction < Instruction
-    def initialize(name, arg_count:, line:)
+    def initialize(name, arg_count:, arg_instructions:, line:)
       super(line:)
       @name = name
       @arg_count = arg_count
+      @arg_instructions = arg_instructions
     end
 
-    attr_reader :name, :arg_count
+    attr_reader :name, :arg_count, :arg_instructions
 
     def instruction_name
       :call

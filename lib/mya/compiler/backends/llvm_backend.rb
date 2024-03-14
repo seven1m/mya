@@ -36,15 +36,6 @@ class Compiler
 
       private
 
-      BUILT_IN_METHODS = {
-        '+': ->(builder, lhs, rhs) { builder.add(lhs, rhs) },
-        '-': ->(builder, lhs, rhs) { builder.sub(lhs, rhs) },
-        '*': ->(builder, lhs, rhs) { builder.mul(lhs, rhs) },
-        '/': ->(builder, lhs, rhs) { builder.sdiv(lhs, rhs) },
-        '==': ->(builder, lhs, rhs) { builder.icmp(:eq, lhs, rhs) },
-        'puts': ->(builder, arg) { build_puts(builder, arg) },
-      }.freeze
-
       def execute(fn)
         LLVM.init_jit
 
@@ -119,16 +110,12 @@ class Compiler
           build_function(fn, instruction.body)
         when CallInstruction
           args = @stack.pop(instruction.arg_count)
-          if (built_in_method = BUILT_IN_METHODS[instruction.name])
-            @stack << instance_exec(builder, *args, &built_in_method)
+          name = instruction.name
+          fn = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
+          if fn.respond_to?(:call)
+            @stack << fn.call(builder:, instruction:, args:)
           else
-            name = instruction.name
-            fn = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
-            if fn.respond_to?(:call)
-              @stack << fn.call(builder:, instruction:, args:)
-            else
-              @stack << builder.call(fn, *args)
-            end
+            @stack << builder.call(fn, *args)
           end
         when PushArgInstruction
           function = @scope_stack.last.fetch(:function)
@@ -200,14 +187,16 @@ class Compiler
         end
       end
 
-      def build_puts(builder, arg)
-        case arg.type.kind
-        when :integer
+      def build_puts(builder:, args:, instruction:)
+        arg = args.first
+        arg_type = instruction.arg_instructions.first.type!.to_sym
+        case arg_type
+        when :int
           builder.call(fn_puts_int, arg)
-        when :pointer # FIXME: need our own type information here
+        when :str
           builder.call(fn_puts_str, arg)
         else
-          raise "Unhandled type: #{arg.type}"
+          raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
         end
       end
 
@@ -248,7 +237,13 @@ class Compiler
             element_type = args.last.type
             array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
             array.push(args.last)
-          end
+          end,
+          '+': -> (builder:, args:, **) { builder.add(*args) },
+          '-': -> (builder:, args:, **) { builder.sub(*args) },
+          '*': -> (builder:, args:, **) { builder.mul(*args) },
+          '/': -> (builder:, args:, **) { builder.sdiv(*args) },
+          '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
+          'puts': -> (**kw) { build_puts(**kw) },
         }
       end
 
