@@ -84,7 +84,7 @@ class Compiler
         when PushStrInstruction
           @stack << build_string(builder, instruction.value)
         when PushNilInstruction
-          @stack << LLVM::Int1.from_i(0)
+          @stack << RcBuilder.pointer_type.null_pointer
         when PushTrueInstruction
           @stack << LLVM::TRUE
         when PushFalseInstruction
@@ -162,10 +162,8 @@ class Compiler
           LLVM::Int1.type
         when :int
           LLVM::Int32.type
-        when :str, :'(int array)'
+        when :str, :'(int array)', :'(nillable str)', :nil
           RcBuilder.pointer_type
-        when :nil
-          LLVM::Int1.type
         else
           raise "Unknown type: #{type.inspect}"
         end
@@ -180,6 +178,12 @@ class Compiler
         when :str
           #     RC*    RC           RC.ptr
           value.to_ptr.read_pointer.read_pointer.read_string
+        when :'(nillable str)'
+          if (ptr = value.to_ptr.read_pointer).null?
+            nil
+          else
+            ptr.read_pointer.read_string
+          end
         when :nil
           nil
         else

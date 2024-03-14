@@ -219,6 +219,22 @@ describe Compiler::Backends::LLVMBackend do
     execute_code(File.read(path))
   end
 
+  it 'evaluates nillable strings' do
+    code = <<~CODE
+      a = "foo" # a:nillable
+      a = nil
+      a
+    CODE
+    expect(execute(code)).must_equal(nil)
+
+    code = <<~CODE
+      a = nil
+      a = "foo"
+      a
+    CODE
+    expect(execute(code)).must_equal('foo')
+  end
+
   it 'evaluates examples/fib.rb' do
     result = execute_file(File.expand_path('../../../examples/fib.rb', __dir__))
     expect(result).must_equal("55\n");
