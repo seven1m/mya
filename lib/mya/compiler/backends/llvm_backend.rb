@@ -187,19 +187,6 @@ class Compiler
         end
       end
 
-      def build_puts(builder:, args:, instruction:)
-        arg = args.first
-        arg_type = instruction.arg_instructions.first.type!.to_sym
-        case arg_type
-        when :int
-          builder.call(fn_puts_int, arg)
-        when :str
-          builder.call(fn_puts_str, arg)
-        else
-          raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
-        end
-      end
-
       def build_string(builder, value)
         string = StringBuilder.new(builder:, mod: @module, string: value)
         string.to_ptr
@@ -243,7 +230,18 @@ class Compiler
           '*': -> (builder:, args:, **) { builder.mul(*args) },
           '/': -> (builder:, args:, **) { builder.sdiv(*args) },
           '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
-          'puts': -> (**kw) { build_puts(**kw) },
+          'puts': -> (builder:, args:, instruction:) do
+            arg = args.first
+            arg_type = instruction.arg_instructions.first.type!.to_sym
+            case arg_type
+            when :int
+              builder.call(fn_puts_int, arg)
+            when :str
+              builder.call(fn_puts_str, arg)
+            else
+              raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
+            end
+          end
         }
       end
 
