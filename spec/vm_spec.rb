@@ -61,19 +61,31 @@ describe VM do
       a << "bar"
       a.last
     CODE
-    expect(execute(code)).must_equal("bar")
+    expect(execute(code)).must_equal('bar')
 
     code = <<~CODE
       a = ["foo", "bar", "baz"]
       a.first
     CODE
-    expect(execute(code)).must_equal("foo")
+    expect(execute(code)).must_equal('foo')
 
     code = <<~CODE
       a = ["foo", "bar", "baz"]
       a.last
     CODE
-    expect(execute(code)).must_equal("baz")
+    expect(execute(code)).must_equal('baz')
+
+    code = <<~CODE
+      a = [nil, "foo", "bar"]
+      a.last
+    CODE
+    expect(execute(code)).must_equal('bar')
+
+    code = <<~CODE
+      a = ["foo", "bar", nil]
+      a.last
+    CODE
+    expect(execute(code)).must_equal(nil)
   end
 
   it 'evaluates method definitions' do

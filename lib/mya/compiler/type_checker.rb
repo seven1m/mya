@@ -238,6 +238,15 @@ class Compiler
         exp.type = type_of_then
       when PushArrayInstruction
         members = @stack.pop(exp.size)
+        if members.any?(NilType)
+          members.map! do |type|
+            if type == NilType
+              NillableType.new(TypeVariable.new(self))
+            else
+              NillableType.new(type)
+            end
+          end
+        end
         members.each_cons(2) do |a, b|
           unify_type(a, b, exp)
         end
@@ -309,6 +318,8 @@ class Compiler
           elsif a.name == 'nillable'
             if b.name == 'nil'
               # noop
+            elsif b.name == 'nillable'
+              unify_type(a.types.first, b.types.first, instruction)
             elsif a.types.first.is_a?(TypeVariable)
               unify_type(a.types.first, b)
             else

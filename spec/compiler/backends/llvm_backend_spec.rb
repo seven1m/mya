@@ -42,6 +42,12 @@ describe Compiler::Backends::LLVMBackend do
     expect(execute(code)).must_equal(3)
 
     code = <<~CODE
+      a = [1, 2, 3]
+      a.last
+    CODE
+    expect(execute(code)).must_equal(3)
+
+    code = <<~CODE
       a = []
       a << 4
       a << 5
@@ -55,19 +61,31 @@ describe Compiler::Backends::LLVMBackend do
       a << "bar"
       a.last
     CODE
-    expect(execute(code)).must_equal("bar")
+    expect(execute(code)).must_equal('bar')
 
     code = <<~CODE
       a = ["foo", "bar", "baz"]
       a.first
     CODE
-    expect(execute(code)).must_equal("foo")
+    expect(execute(code)).must_equal('foo')
 
     code = <<~CODE
       a = ["foo", "bar", "baz"]
       a.last
     CODE
-    expect(execute(code)).must_equal("baz")
+    expect(execute(code)).must_equal('baz')
+
+    code = <<~CODE
+      a = [nil, "foo", "bar"]
+      a.last
+    CODE
+    expect(execute(code)).must_equal('bar')
+
+    code = <<~CODE
+      a = ["foo", "bar", nil]
+      a.last
+    CODE
+    expect(execute(code)).must_equal(nil)
   end
 
   it 'evaluates method definitions' do
