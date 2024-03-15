@@ -162,28 +162,49 @@ class Compiler
           LLVM::Int1.type
         when :int
           LLVM::Int32.type
-        when :str, :'(int array)', :'(nillable str)', :nil
-          RcBuilder.pointer_type
         else
-          raise "Unknown type: #{type.inspect}"
+          RcBuilder.pointer_type
         end
       end
 
       def llvm_type_to_ruby(value, type)
+        case type.to_sym
+        when :bool, :int, :nil
+          read_llvm_type_as_ruby(value, type)
+        when :str
+          ptr = read_rc_pointer(value)
+          read_llvm_type_as_ruby(ptr, type)
+        else
+          if type.name == 'nillable'
+            if (ptr = read_rc_pointer(value, nillable: true))
+              read_llvm_type_as_ruby(ptr, type.types.first)
+            else
+              nil
+            end
+          else
+            raise "Unknown type: #{type.inspect}"
+          end
+        end
+      end
+
+      def read_rc_pointer(value, nillable: false)
+        rc_ptr = value.to_ptr.read_pointer
+        if nillable && rc_ptr.null?
+          nil
+        else
+          # NOTE: this works because the ptr is the first field of the RC struct.
+          rc_ptr.read_pointer
+        end
+      end
+
+      def read_llvm_type_as_ruby(value, type)
         case type.to_sym
         when :bool
           value.to_i == -1
         when :int
           value.to_i
         when :str
-          #     RC*    RC           RC.ptr
-          value.to_ptr.read_pointer.read_pointer.read_string
-        when :'(nillable str)'
-          if (ptr = value.to_ptr.read_pointer).null?
-            nil
-          else
-            ptr.read_pointer.read_string
-          end
+          value.read_string
         when :nil
           nil
         else

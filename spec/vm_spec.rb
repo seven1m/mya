@@ -86,6 +86,14 @@ describe VM do
       a.last
     CODE
     expect(execute(code)).must_equal(nil)
+
+    code = <<~CODE
+      a = [1, 2, 3]
+      b = [4, 5, 6]
+      c = [a, b, nil]
+      c.last
+    CODE
+    expect(execute(code)).must_equal(nil)
   end
 
   it 'evaluates method definitions' do
