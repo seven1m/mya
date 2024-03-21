@@ -35,14 +35,6 @@ class VM
   end
 
   BUILT_IN_METHODS = {
-    '+': nil,
-    '-': nil,
-    '*': nil,
-    '/': nil,
-    '==': nil,
-    'first': nil,
-    'last': nil,
-    '<<': nil,
     'puts': ->(arg, io:) { io.puts(arg); arg.to_s.size },
   }.freeze
 
@@ -67,6 +59,13 @@ class VM
       @methods[instruction.name] = instruction
     when Compiler::CallInstruction
       new_args = @stack.pop(instruction.arg_count)
+      if instruction.has_receiver?
+        receiver = @stack.pop
+        if receiver.respond_to?(instruction.name)
+          @stack << receiver.send(instruction.name, *new_args)
+          return
+        end
+      end
       if BUILT_IN_METHODS.key?(instruction.name)
         @stack << if (built_in_method = BUILT_IN_METHODS[instruction.name])
                     built_in_method.call(*new_args, io: @io)

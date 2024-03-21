@@ -153,6 +153,26 @@ class Compiler
     end
   end
 
+  class SetInstanceVarInstruction < Instruction
+    def initialize(name, nillable:, line:)
+      super(line:)
+      @name = name
+      @nillable = nillable
+    end
+
+    attr_reader :name
+
+    def nillable? = @nillable
+
+    def instruction_name
+      :set_ivar
+    end
+
+    def to_h
+      super.merge(name:, nillable: nillable?)
+    end
+  end
+
   class PushArgInstruction < Instruction
     def initialize(index, line:)
       super(line:)
@@ -170,22 +190,42 @@ class Compiler
     end
   end
 
-  class CallInstruction < Instruction
-    def initialize(name, arg_count:, arg_instructions:, line:)
+  class PushConstInstruction < Instruction
+    def initialize(name, line:)
       super(line:)
       @name = name
+    end
+
+    attr_reader :name
+
+    def instruction_name
+      :push_const
+    end
+
+    def to_h
+      super.merge(name:)
+    end
+  end
+
+  class CallInstruction < Instruction
+    def initialize(name, has_receiver:, arg_count:, arg_instructions:, line:)
+      super(line:)
+      @name = name
+      @has_receiver = has_receiver
       @arg_count = arg_count
       @arg_instructions = arg_instructions
     end
 
-    attr_reader :name, :arg_count, :arg_instructions
+    attr_reader :name, :has_receiver, :arg_count, :arg_instructions
 
     def instruction_name
       :call
     end
 
+    def has_receiver? = @has_receiver
+
     def to_h
-      super.merge(name:, arg_count:)
+      super.merge(name:, has_receiver:, arg_count:)
     end
   end
 
@@ -230,6 +270,27 @@ class Compiler
       super.merge(
         name:,
         params:,
+        body: body.map(&:to_h)
+      )
+    end
+  end
+
+  class ClassInstruction < Instruction
+    def initialize(name, line:)
+      super(line:)
+      @name = name
+    end
+
+    attr_reader :name
+    attr_accessor :body
+
+    def instruction_name
+      :class
+    end
+
+    def to_h
+      super.merge(
+        name:,
         body: body.map(&:to_h)
       )
     end

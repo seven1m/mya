@@ -89,12 +89,18 @@ class Compiler
       @scope_stack.pop
       instruction
     when Prism::CallNode
+      transform(node.receiver, instructions) if node.receiver
       args = (node.arguments&.arguments || [])
-      args.unshift(node.receiver) if node.receiver
       arg_instructions = args.map do |arg|
         transform(arg, instructions)
       end
-      instruction = CallInstruction.new(node.name, arg_count: args.size, arg_instructions:, line: node.location.start_line)
+      instruction = CallInstruction.new(
+        node.name,
+        has_receiver: !!node.receiver,
+        arg_count: args.size,
+        arg_instructions:,
+        line: node.location.start_line
+      )
       instructions << instruction
       instruction
     when Prism::IfNode
@@ -113,6 +119,26 @@ class Compiler
         transform(element, instructions)
       end
       instruction = PushArrayInstruction.new(node.elements.size, line: node.location.start_line)
+      instructions << instruction
+      instruction
+    when Prism::ClassNode
+      name = node.constant_path.name
+      body = node.body
+      instruction = ClassInstruction.new(name, line: node.location.start_line)
+      instructions << instruction
+      class_instructions = []
+      transform(node.body, class_instructions)
+      instruction.body = class_instructions
+      instruction
+    when Prism::InstanceVariableWriteNode
+      value_instruction = transform(node.value, instructions)
+      directives = @directives.dig(node.location.start_line, node.name) || []
+      nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
+      instruction = SetInstanceVarInstruction.new(node.name, nillable:, line: node.location.start_line)
+      instructions << instruction
+      instruction
+    when Prism::ConstantReadNode
+      instruction = PushConstInstruction.new(node.name, line: node.location.start_line)
       instructions << instruction
       instruction
     else

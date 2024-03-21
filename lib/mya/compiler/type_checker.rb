@@ -1,5 +1,13 @@
 require 'set'
 
+class Hash
+  def deep_dup
+    each_with_object({}) do |(key, val), hash|
+      hash[key] = val.is_a?(Hash) ? val.deep_dup : val
+    end
+  end
+end
+
 class Compiler
   class TypeVariable
     def initialize(type_checker)
@@ -112,6 +120,18 @@ class Compiler
     end
   end
 
+  class ClassType < TypeOperator
+    def initialize(name, attributes)
+      super('class', [])
+      @name = name
+      @attributes = attributes
+    end
+
+    def to_s
+      "(class #{@name})"
+    end
+  end
+
   IntType = TypeOperator.new('int', [])
   StrType = TypeOperator.new('str', [])
   NilType = TypeOperator.new('nil', [])
@@ -126,10 +146,19 @@ class Compiler
     def initialize
       @stack = []
       @scope_stack = []
+      @classes = {}
+      @calls_to_unify = []
     end
 
     def analyze(exp, env = build_initial_env, non_generic_vars = Set.new)
       analyze_exp(exp, env, non_generic_vars).prune
+      @calls_to_unify.each do |call|
+        type_of_receiver = call.fetch(:type_of_receiver).prune
+        exp = call.fetch(:exp)
+        type_of_fun = retrieve_type(type_of_receiver, exp.name, call.fetch(:env), call.fetch(:non_generic_vars))
+        raise UndefinedSymbol, "undefined method #{exp.name} on #{type_of_receiver.inspect} on line #{exp.line}" unless type_of_fun
+        unify_type(type_of_fun, call.fetch(:type_of_fun), exp)
+      end
     end
 
     def next_variable_id
@@ -172,7 +201,7 @@ class Compiler
         exp.type = NilType
       when SetVarInstruction
         type = @stack.pop
-        if (existing_type = env[exp.name])
+        if (existing_type = env.dig(nil, exp.name))
           unify_type(existing_type, type, exp)
           type = existing_type
         elsif type == NilType
@@ -180,10 +209,10 @@ class Compiler
         elsif exp.nillable?
           type = NillableType.new(type)
         end
-        env[exp.name] = type
+        env[nil][exp.name] = type
         exp.type = type
       when PushVarInstruction
-        type = retrieve_type(exp.name, env, non_generic_vars)
+        type = retrieve_type(nil, exp.name, env, non_generic_vars)
         raise UndefinedSymbol, "undefined symbol #{exp.name.inspect}" unless type
         @stack << type
         exp.type = type
@@ -193,10 +222,10 @@ class Compiler
         exp.type = type
       when DefInstruction
         new_type_var = TypeVariable.new(self)
-        env[exp.name] = new_type_var
+        env[nil][exp.name] = new_type_var
         non_generic_vars << new_type_var
 
-        body_env = env.dup
+        body_env = env.deep_dup
         body_non_generic_vars = non_generic_vars.dup
 
         parameter_types = exp.params.map do |param|
@@ -211,23 +240,39 @@ class Compiler
         @scope_stack.pop
 
         type_of_fun = FunctionType.new(*parameter_types, type_of_body)
+        unify_type(type_of_fun, new_type_var, exp)
 
-        env[exp.name] = type_of_fun
+        env[nil][exp.name] = type_of_fun
         non_generic_vars << type_of_fun
         exp.type = type_of_fun
 
         type_of_fun
       when CallInstruction
-        type_of_fun = retrieve_type(exp.name, env, non_generic_vars)
-        raise UndefinedSymbol, "undefined method #{exp.name}" unless type_of_fun
-
         type_of_args = @stack.pop(exp.arg_count)
+
+        if exp.has_receiver?
+          type_of_receiver = @stack.pop or raise('Expected receiver on stack but got nil')
+          type_of_args.unshift(type_of_receiver)
+        end
+
+        if type_of_receiver&.prune.is_a?(TypeVariable)
+          # We cannot unify yet, since we don't know the receiver type.
+          # Save this call for later unification.
+          type_of_return = TypeVariable.new(self)
+          type_of_fun = FunctionType.new(*type_of_args, type_of_return)
+          @calls_to_unify << { type_of_receiver:, type_of_fun:, exp:, env:, non_generic_vars: }
+          exp.type = type_of_return
+          @stack << type_of_return
+          return type_of_return
+        end
+
+        type_of_fun = retrieve_type(type_of_receiver, exp.name, env, non_generic_vars)
+        raise UndefinedSymbol, "undefined method #{exp.name}" unless type_of_fun
 
         type_of_return = TypeVariable.new(self)
         unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return), exp)
 
         exp.type = type_of_return
-
         @stack << type_of_return
         type_of_return
       when IfInstruction
@@ -255,13 +300,20 @@ class Compiler
         type_of_array = AryType.new(member_type)
         @stack << type_of_array
         exp.type = type_of_array
+      when PushConstInstruction
+        klass = @classes[exp.name]
+        @stack << klass
+        exp.type = klass
+      when ClassInstruction
+        klass = @classes[exp.name] = ClassType.new(exp.name, {})
+        exp.type = klass
       else
         raise "unknown expression: #{exp.inspect}"
       end
     end
 
-    def retrieve_type(name, env, non_generic_vars)
-      return unless (exp = env[name])
+    def retrieve_type(type, name, env, non_generic_vars)
+      return unless (exp = env.dig(type&.name, name))
 
       fresh_type(exp, non_generic_vars)
     end
@@ -351,7 +403,7 @@ class Compiler
     def raise_type_clash_error(a, b, instruction = nil)
       message = case instruction
       when CallInstruction
-        "#{a} cannot unify with #{b} in call to #{instruction.name}"
+        "#{a} cannot unify with #{b} in call to #{instruction.name} on line #{instruction.line}"
       when IfInstruction
         "one branch of `if` has type #{a} and the other has type #{b}"
       when SetVarInstruction
@@ -368,20 +420,26 @@ class Compiler
       array_type = TypeVariable.new(self)
       array = AryType.new(array_type)
       {
-        "true": BoolType,
-        "false": BoolType,
-        zero?: FunctionType.new(IntType, BoolType),
-        "+": FunctionType.new(IntType, IntType, IntType),
-        "==": FunctionType.new(IntType, IntType, BoolType),
-        "-": FunctionType.new(IntType, IntType, IntType),
-        "*": FunctionType.new(IntType, IntType, IntType),
-        "/": FunctionType.new(IntType, IntType, IntType),
-        nth: FunctionType.new(array, IntType, array_type),
-        first: FunctionType.new(array, array_type),
-        last: FunctionType.new(array, array_type),
-        '<<': FunctionType.new(array, array_type, array),
-        push: FunctionType.new(array, array_type, array_type),
-        puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
+        nil => {
+          "true": BoolType,
+          "false": BoolType,
+          puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
+        },
+        'int' => {
+          zero?: FunctionType.new(IntType, BoolType),
+          "+": FunctionType.new(IntType, IntType, IntType),
+          "==": FunctionType.new(IntType, IntType, BoolType),
+          "-": FunctionType.new(IntType, IntType, IntType),
+          "*": FunctionType.new(IntType, IntType, IntType),
+          "/": FunctionType.new(IntType, IntType, IntType),
+        },
+        'array' => {
+          nth: FunctionType.new(array, IntType, array_type),
+          first: FunctionType.new(array, array_type),
+          last: FunctionType.new(array, array_type),
+          '<<': FunctionType.new(array, array_type, array),
+          push: FunctionType.new(array, array_type, array_type),
+        },
       }
     end
   end

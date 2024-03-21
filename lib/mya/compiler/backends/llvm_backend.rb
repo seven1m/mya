@@ -110,6 +110,9 @@ class Compiler
           build_function(fn, instruction.body)
         when CallInstruction
           args = @stack.pop(instruction.arg_count)
+          if instruction.has_receiver?
+            args.unshift @stack.pop
+          end
           name = instruction.name
           fn = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
           if fn.respond_to?(:call)
