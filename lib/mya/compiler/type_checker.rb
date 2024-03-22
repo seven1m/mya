@@ -160,17 +160,18 @@ class Compiler
 
     def initialize
       @stack = []
-      @scope_stack = []
+      @scope_stack = [{ vars: {} }]
       @classes = {}
       @calls_to_unify = []
+      @methods = build_initial_methods
     end
 
-    def analyze(exp, env = build_initial_env)
-      analyze_exp(exp, env).prune
+    def analyze(exp)
+      analyze_exp(exp).prune
       @calls_to_unify.each do |call|
         type_of_receiver = call.fetch(:type_of_receiver).prune
         exp = call.fetch(:exp)
-        type_of_fun = retrieve_type(type_of_receiver, exp.name, call.fetch(:env))
+        type_of_fun = retrieve_method(type_of_receiver, exp.name)
         raise UndefinedSymbol, "undefined method #{exp.name} on #{type_of_receiver.inspect} on line #{exp.line}" unless type_of_fun
         unify_type(type_of_fun, call.fetch(:type_of_fun), exp)
       end
@@ -194,12 +195,12 @@ class Compiler
 
     private
 
-    def analyze_exp(exp, env)
+    def analyze_exp(exp)
       case exp
       when Array
         last_type = nil
         exp.each do |e|
-          last_type = analyze_exp(e, env)
+          last_type = analyze_exp(e)
         end
         last_type
       when PushIntInstruction
@@ -216,7 +217,7 @@ class Compiler
         exp.type = NilType
       when SetVarInstruction
         type = @stack.pop
-        if (existing_type = env.dig(nil, exp.name))
+        if (existing_type = vars[exp.name])
           unify_type(existing_type, type, exp)
           type = existing_type
         elsif type == NilType
@@ -224,37 +225,36 @@ class Compiler
         elsif exp.nillable?
           type = NillableType.new(type)
         end
-        env[nil][exp.name] = type
+        vars[exp.name] = type
         exp.type = type
       when PushVarInstruction
-        type = retrieve_type(nil, exp.name, env)
+        type = retrieve_var(exp.name)
         raise UndefinedSymbol, "undefined symbol #{exp.name.inspect}" unless type
         @stack << type
         exp.type = type
       when PushArgInstruction
-        type = @scope_stack.last.fetch(:parameter_types).fetch(exp.index)
+        type = scope.fetch(:parameter_types).fetch(exp.index)
         @stack << type
         exp.type = type
       when DefInstruction
-        new_type_var = TypeVariable.new(self)
-        env[nil][exp.name] = new_type_var.non_generic!
+        placeholder_var = TypeVariable.new(self)
+        vars[exp.name] = placeholder_var.non_generic!
+        @methods[nil][exp.name] = placeholder_var.non_generic!
 
-        body_env = env.deep_dup
-
+        new_vars = {}
         parameter_types = exp.params.map do |param|
-          type_of_parameter = TypeVariable.new(self).non_generic!
-          body_env.merge!(param => type_of_parameter)
-          type_of_parameter
+          new_vars[param] = TypeVariable.new(self).non_generic!
         end
 
-        @scope_stack << { parameter_types: }
-        type_of_body = analyze_exp(exp.body, body_env)
+        @scope_stack << { parameter_types:, vars: new_vars }
+        type_of_body = analyze_exp(exp.body)
         @scope_stack.pop
 
         type_of_fun = FunctionType.new(*parameter_types, type_of_body)
-        unify_type(type_of_fun, new_type_var, exp)
+        unify_type(type_of_fun, placeholder_var, exp)
 
-        env[nil][exp.name] = type_of_fun.non_generic!
+        vars[exp.name] = type_of_fun.non_generic!
+        @methods[nil][exp.name] = type_of_fun.non_generic!
         exp.type = type_of_fun
 
         type_of_fun
@@ -271,13 +271,13 @@ class Compiler
           # Save this call for later unification.
           type_of_return = TypeVariable.new(self)
           type_of_fun = FunctionType.new(*type_of_args, type_of_return)
-          @calls_to_unify << { type_of_receiver:, type_of_fun:, exp:, env: }
+          @calls_to_unify << { type_of_receiver:, type_of_fun:, exp: }
           exp.type = type_of_return
           @stack << type_of_return
           return type_of_return
         end
 
-        type_of_fun = retrieve_type(type_of_receiver, exp.name, env)
+        type_of_fun = retrieve_method(type_of_receiver, exp.name)
         raise UndefinedSymbol, "undefined method #{exp.name}" unless type_of_fun
 
         type_of_return = TypeVariable.new(self)
@@ -288,8 +288,8 @@ class Compiler
         type_of_return
       when IfInstruction
         condition = @stack.pop
-        type_of_then = analyze_exp(exp.if_true, env)
-        type_of_else = analyze_exp(exp.if_false, env)
+        type_of_then = analyze_exp(exp.if_true)
+        type_of_else = analyze_exp(exp.if_false)
         unify_type(type_of_then, type_of_else, exp)
         exp.type = type_of_then
       when PushArrayInstruction
@@ -323,8 +323,14 @@ class Compiler
       end
     end
 
-    def retrieve_type(type, name, env)
-      return unless (exp = env.dig(type&.name, name))
+    def retrieve_method(type, name)
+      return unless (exp = @methods.dig(type&.name, name))
+
+      fresh_type(exp)
+    end
+
+    def retrieve_var(name)
+      return unless (exp = vars[name])
 
       fresh_type(exp)
     end
@@ -427,13 +433,19 @@ class Compiler
       raise TypeClash, message
     end
 
-    def build_initial_env
+    def scope
+      @scope_stack.last or raise('No scope!')
+    end
+
+    def vars
+      scope.fetch(:vars)
+    end
+
+    def build_initial_methods
       array_type = TypeVariable.new(self)
       array = AryType.new(array_type)
       {
         nil => {
-          "true": BoolType,
-          "false": BoolType,
           puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
         },
         'int' => {
