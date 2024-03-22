@@ -171,10 +171,7 @@ class Compiler
       analyze_instruction(instruction).prune
       @calls_to_unify.each do |call|
         type_of_receiver = call.fetch(:type_of_receiver).prune
-        instruction = call.fetch(:instruction)
-        type_of_fun = retrieve_method(type_of_receiver, instruction.name)
-        raise UndefinedMethod, "undefined method #{instruction.name} on #{type_of_receiver.inspect} on line #{instruction.line}" unless type_of_fun
-        unify_type(type_of_fun, call.fetch(:type_of_fun), instruction)
+        retrieve_method_and_analyze_call(**call, type_of_receiver:)
       end
     end
 
@@ -216,26 +213,30 @@ class Compiler
         type_of_args.unshift(type_of_receiver)
       end
 
+      type_of_return = TypeVariable.new(self)
+      type_of_fun = FunctionType.new(*type_of_args, type_of_return)
+
       if type_of_receiver&.prune.is_a?(TypeVariable)
         # We cannot unify yet, since we don't know the receiver type.
         # Save this call for later unification.
-        type_of_return = TypeVariable.new(self)
-        type_of_fun = FunctionType.new(*type_of_args, type_of_return)
         @calls_to_unify << { type_of_receiver:, type_of_fun:, instruction: }
         instruction.type = type_of_return
         @stack << type_of_return
         return type_of_return
       end
 
-      type_of_fun = retrieve_method(type_of_receiver, instruction.name)
-      raise UndefinedMethod, "undefined method #{instruction.name}" unless type_of_fun
-
-      type_of_return = TypeVariable.new(self)
-      unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return), instruction)
+      retrieve_method_and_analyze_call(type_of_receiver:, type_of_fun:, instruction:)
 
       instruction.type = type_of_return
       @stack << type_of_return
       type_of_return
+    end
+
+    def retrieve_method_and_analyze_call(type_of_receiver:, type_of_fun:, instruction:)
+      known_type = retrieve_method(type_of_receiver, instruction.name)
+      raise UndefinedMethod, "undefined method #{instruction.name}" unless known_type
+
+      unify_type(known_type, type_of_fun, instruction)
     end
 
     def analyze_class(instruction)
