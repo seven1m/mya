@@ -194,15 +194,15 @@ class Compiler
     private
 
     def analyze_instruction(instruction)
-      if instruction.is_a?(Array)
-        last_type = nil
-        instruction.each do |e|
-          last_type = analyze_instruction(e)
-        end
-        return last_type
-      end
+      return analyze_array_of_instructions(instruction) if instruction.is_a?(Array)
 
       send("analyze_#{instruction.instruction_name}", instruction)
+    end
+
+    def analyze_array_of_instructions(array)
+      array.map do |instruction|
+        analyze_instruction(instruction)
+      end.last
     end
 
     def analyze_call(instruction)
