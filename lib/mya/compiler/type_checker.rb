@@ -13,6 +13,7 @@ class Compiler
     def initialize(type_checker)
       @type_checker = type_checker
       @id = @type_checker.next_variable_id
+      @generic = true
     end
 
     attr_accessor :id, :instance
@@ -33,10 +34,19 @@ class Compiler
       "TypeVariable(id = #{id})"
     end
 
+    def generic? = @generic
+
+    def non_generic!
+      @generic = false
+      self
+    end
+
     def prune
       return self if @instance.nil?
 
       @instance = @instance.prune
+      @instance.non_generic! unless generic?
+      @instance
     end
   end
 
@@ -67,6 +77,11 @@ class Compiler
       "#<TypeOperator name=#{name} types=#{types.join(', ')}>"
     end
 
+    def non_generic!
+      types.each(&:non_generic!)
+      self
+    end
+
     def prune
       dup.tap do |new_type|
         new_type.types = types.map(&:prune)
@@ -86,7 +101,7 @@ class Compiler
     end
 
     def inspect
-      "#<FunctionType #{types.join(', ')}>"
+      "#<FunctionType #{types.map(&:inspect).join(', ')}>"
     end
   end
 
@@ -150,12 +165,12 @@ class Compiler
       @calls_to_unify = []
     end
 
-    def analyze(exp, env = build_initial_env, non_generic_vars = Set.new)
-      analyze_exp(exp, env, non_generic_vars).prune
+    def analyze(exp, env = build_initial_env)
+      analyze_exp(exp, env).prune
       @calls_to_unify.each do |call|
         type_of_receiver = call.fetch(:type_of_receiver).prune
         exp = call.fetch(:exp)
-        type_of_fun = retrieve_type(type_of_receiver, exp.name, call.fetch(:env), call.fetch(:non_generic_vars))
+        type_of_fun = retrieve_type(type_of_receiver, exp.name, call.fetch(:env))
         raise UndefinedSymbol, "undefined method #{exp.name} on #{type_of_receiver.inspect} on line #{exp.line}" unless type_of_fun
         unify_type(type_of_fun, call.fetch(:type_of_fun), exp)
       end
@@ -179,12 +194,12 @@ class Compiler
 
     private
 
-    def analyze_exp(exp, env, non_generic_vars)
+    def analyze_exp(exp, env)
       case exp
       when Array
         last_type = nil
         exp.each do |e|
-          last_type = analyze_exp(e, env, non_generic_vars)
+          last_type = analyze_exp(e, env)
         end
         last_type
       when PushIntInstruction
@@ -212,7 +227,7 @@ class Compiler
         env[nil][exp.name] = type
         exp.type = type
       when PushVarInstruction
-        type = retrieve_type(nil, exp.name, env, non_generic_vars)
+        type = retrieve_type(nil, exp.name, env)
         raise UndefinedSymbol, "undefined symbol #{exp.name.inspect}" unless type
         @stack << type
         exp.type = type
@@ -222,28 +237,24 @@ class Compiler
         exp.type = type
       when DefInstruction
         new_type_var = TypeVariable.new(self)
-        env[nil][exp.name] = new_type_var
-        non_generic_vars << new_type_var
+        env[nil][exp.name] = new_type_var.non_generic!
 
         body_env = env.deep_dup
-        body_non_generic_vars = non_generic_vars.dup
 
         parameter_types = exp.params.map do |param|
-          type_of_parameter = TypeVariable.new(self)
+          type_of_parameter = TypeVariable.new(self).non_generic!
           body_env.merge!(param => type_of_parameter)
-          body_non_generic_vars << type_of_parameter
           type_of_parameter
         end
 
         @scope_stack << { parameter_types: }
-        type_of_body = analyze_exp(exp.body, body_env, body_non_generic_vars)
+        type_of_body = analyze_exp(exp.body, body_env)
         @scope_stack.pop
 
         type_of_fun = FunctionType.new(*parameter_types, type_of_body)
         unify_type(type_of_fun, new_type_var, exp)
 
-        env[nil][exp.name] = type_of_fun
-        non_generic_vars << type_of_fun
+        env[nil][exp.name] = type_of_fun.non_generic!
         exp.type = type_of_fun
 
         type_of_fun
@@ -260,13 +271,13 @@ class Compiler
           # Save this call for later unification.
           type_of_return = TypeVariable.new(self)
           type_of_fun = FunctionType.new(*type_of_args, type_of_return)
-          @calls_to_unify << { type_of_receiver:, type_of_fun:, exp:, env:, non_generic_vars: }
+          @calls_to_unify << { type_of_receiver:, type_of_fun:, exp:, env: }
           exp.type = type_of_return
           @stack << type_of_return
           return type_of_return
         end
 
-        type_of_fun = retrieve_type(type_of_receiver, exp.name, env, non_generic_vars)
+        type_of_fun = retrieve_type(type_of_receiver, exp.name, env)
         raise UndefinedSymbol, "undefined method #{exp.name}" unless type_of_fun
 
         type_of_return = TypeVariable.new(self)
@@ -277,8 +288,8 @@ class Compiler
         type_of_return
       when IfInstruction
         condition = @stack.pop
-        type_of_then = analyze_exp(exp.if_true, env, non_generic_vars)
-        type_of_else = analyze_exp(exp.if_false, env, non_generic_vars)
+        type_of_then = analyze_exp(exp.if_true, env)
+        type_of_else = analyze_exp(exp.if_false, env)
         unify_type(type_of_then, type_of_else, exp)
         exp.type = type_of_then
       when PushArrayInstruction
@@ -296,7 +307,7 @@ class Compiler
           unify_type(a, b, exp)
         end
         member_type = members.first || TypeVariable.new(self)
-        non_generic_vars << member_type
+        member_type.non_generic!
         type_of_array = AryType.new(member_type)
         @stack << type_of_array
         exp.type = type_of_array
@@ -312,24 +323,24 @@ class Compiler
       end
     end
 
-    def retrieve_type(type, name, env, non_generic_vars)
+    def retrieve_type(type, name, env)
       return unless (exp = env.dig(type&.name, name))
 
-      fresh_type(exp, non_generic_vars)
+      fresh_type(exp)
     end
 
-    def fresh_type(type_exp, non_generic_vars, env = {})
+    def fresh_type(type_exp, env = {})
       type_exp = type_exp.prune
       case type_exp
       when TypeVariable
-        if occurs_in_type_list?(type_exp, non_generic_vars)
-          type_exp
-        else
+        if type_exp.generic?
           env[type_exp] ||= TypeVariable.new(self)
+        else
+          type_exp
         end
       when TypeOperator
         type_exp.dup.tap do |new_type|
-          new_type.types = type_exp.types.map { |t| fresh_type(t, non_generic_vars, env) }
+          new_type.types = type_exp.types.map { |t| fresh_type(t, env) }
         end
       end
     end
