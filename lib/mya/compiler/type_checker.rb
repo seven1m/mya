@@ -156,7 +156,8 @@ class Compiler
     class Error < StandardError; end
     class RecursiveUnification < Error; end
     class TypeClash < Error; end
-    class UndefinedSymbol < Error; end
+    class UndefinedMethod < Error; end
+    class UndefinedVariable < Error; end
 
     def initialize
       @stack = []
@@ -166,14 +167,14 @@ class Compiler
       @methods = build_initial_methods
     end
 
-    def analyze(exp)
-      analyze_exp(exp).prune
+    def analyze(instruction)
+      analyze_instruction(instruction).prune
       @calls_to_unify.each do |call|
         type_of_receiver = call.fetch(:type_of_receiver).prune
-        exp = call.fetch(:exp)
-        type_of_fun = retrieve_method(type_of_receiver, exp.name)
-        raise UndefinedSymbol, "undefined method #{exp.name} on #{type_of_receiver.inspect} on line #{exp.line}" unless type_of_fun
-        unify_type(type_of_fun, call.fetch(:type_of_fun), exp)
+        instruction = call.fetch(:instruction)
+        type_of_fun = retrieve_method(type_of_receiver, instruction.name)
+        raise UndefinedMethod, "undefined method #{instruction.name} on #{type_of_receiver.inspect} on line #{instruction.line}" unless type_of_fun
+        unify_type(type_of_fun, call.fetch(:type_of_fun), instruction)
       end
     end
 
@@ -195,169 +196,200 @@ class Compiler
 
     private
 
-    def analyze_exp(exp)
-      case exp
-      when Array
+    def analyze_instruction(instruction)
+      if instruction.is_a?(Array)
         last_type = nil
-        exp.each do |e|
-          last_type = analyze_exp(e)
+        instruction.each do |e|
+          last_type = analyze_instruction(e)
         end
-        last_type
-      when PushIntInstruction
-        @stack << IntType
-        exp.type = IntType
-      when PushStrInstruction
-        @stack << StrType
-        exp.type = StrType
-      when PushTrueInstruction, PushFalseInstruction
-        @stack << BoolType
-        exp.type = BoolType
-      when PushNilInstruction
-        @stack << NilType
-        exp.type = NilType
-      when SetVarInstruction
-        type = @stack.pop
-        if (existing_type = vars[exp.name])
-          unify_type(existing_type, type, exp)
-          type = existing_type
-        elsif type == NilType
-          type = NillableType.new(TypeVariable.new(self))
-        elsif exp.nillable?
-          type = NillableType.new(type)
-        end
-        vars[exp.name] = type
-        exp.type = type
-      when PushVarInstruction
-        type = retrieve_var(exp.name)
-        raise UndefinedSymbol, "undefined symbol #{exp.name.inspect}" unless type
-        @stack << type
-        exp.type = type
-      when PushArgInstruction
-        type = scope.fetch(:parameter_types).fetch(exp.index)
-        @stack << type
-        exp.type = type
-      when DefInstruction
-        placeholder_var = TypeVariable.new(self)
-        vars[exp.name] = placeholder_var.non_generic!
-        @methods[nil][exp.name] = placeholder_var.non_generic!
+        return last_type
+      end
 
-        new_vars = {}
-        parameter_types = exp.params.map do |param|
-          new_vars[param] = TypeVariable.new(self).non_generic!
-        end
+      send("analyze_#{instruction.instruction_name}", instruction)
+    end
 
-        @scope_stack << { parameter_types:, vars: new_vars }
-        type_of_body = analyze_exp(exp.body)
-        @scope_stack.pop
+    def analyze_call(instruction)
+      type_of_args = @stack.pop(instruction.arg_count)
 
-        type_of_fun = FunctionType.new(*parameter_types, type_of_body)
-        unify_type(type_of_fun, placeholder_var, exp)
+      if instruction.has_receiver?
+        type_of_receiver = @stack.pop or raise('instructionected receiver on stack but got nil')
+        type_of_args.unshift(type_of_receiver)
+      end
 
-        vars[exp.name] = type_of_fun.non_generic!
-        @methods[nil][exp.name] = type_of_fun.non_generic!
-        exp.type = type_of_fun
-
-        type_of_fun
-      when CallInstruction
-        type_of_args = @stack.pop(exp.arg_count)
-
-        if exp.has_receiver?
-          type_of_receiver = @stack.pop or raise('Expected receiver on stack but got nil')
-          type_of_args.unshift(type_of_receiver)
-        end
-
-        if type_of_receiver&.prune.is_a?(TypeVariable)
-          # We cannot unify yet, since we don't know the receiver type.
-          # Save this call for later unification.
-          type_of_return = TypeVariable.new(self)
-          type_of_fun = FunctionType.new(*type_of_args, type_of_return)
-          @calls_to_unify << { type_of_receiver:, type_of_fun:, exp: }
-          exp.type = type_of_return
-          @stack << type_of_return
-          return type_of_return
-        end
-
-        type_of_fun = retrieve_method(type_of_receiver, exp.name)
-        raise UndefinedSymbol, "undefined method #{exp.name}" unless type_of_fun
-
+      if type_of_receiver&.prune.is_a?(TypeVariable)
+        # We cannot unify yet, since we don't know the receiver type.
+        # Save this call for later unification.
         type_of_return = TypeVariable.new(self)
-        unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return), exp)
-
-        exp.type = type_of_return
+        type_of_fun = FunctionType.new(*type_of_args, type_of_return)
+        @calls_to_unify << { type_of_receiver:, type_of_fun:, instruction: }
+        instruction.type = type_of_return
         @stack << type_of_return
-        type_of_return
-      when IfInstruction
-        condition = @stack.pop
-        type_of_then = analyze_exp(exp.if_true)
-        type_of_else = analyze_exp(exp.if_false)
-        unify_type(type_of_then, type_of_else, exp)
-        exp.type = type_of_then
-      when PushArrayInstruction
-        members = @stack.pop(exp.size)
-        if members.any?(NilType)
-          members.map! do |type|
-            if type == NilType
-              NillableType.new(TypeVariable.new(self))
-            else
-              NillableType.new(type)
-            end
+        return type_of_return
+      end
+
+      type_of_fun = retrieve_method(type_of_receiver, instruction.name)
+      raise UndefinedMethod, "undefined method #{instruction.name}" unless type_of_fun
+
+      type_of_return = TypeVariable.new(self)
+      unify_type(type_of_fun, FunctionType.new(*type_of_args, type_of_return), instruction)
+
+      instruction.type = type_of_return
+      @stack << type_of_return
+      type_of_return
+    end
+
+    def analyze_class(instruction)
+      klass = @classes[instruction.name] = ClassType.new(instruction.name, {})
+      instruction.type = klass
+    end
+
+    def analyze_def(instruction)
+      placeholder_var = TypeVariable.new(self)
+      vars[instruction.name] = placeholder_var.non_generic!
+      @methods[nil][instruction.name] = placeholder_var.non_generic!
+
+      new_vars = {}
+      parameter_types = instruction.params.map do |param|
+        new_vars[param] = TypeVariable.new(self).non_generic!
+      end
+
+      @scope_stack << { parameter_types:, vars: new_vars }
+      type_of_body = analyze_instruction(instruction.body)
+      @scope_stack.pop
+
+      type_of_fun = FunctionType.new(*parameter_types, type_of_body)
+      unify_type(type_of_fun, placeholder_var, instruction)
+
+      vars[instruction.name] = type_of_fun.non_generic!
+      @methods[nil][instruction.name] = type_of_fun.non_generic!
+      instruction.type = type_of_fun
+
+      type_of_fun
+    end
+
+    def analyze_if(instruction)
+      condition = @stack.pop
+      type_of_then = analyze_instruction(instruction.if_true)
+      type_of_else = analyze_instruction(instruction.if_false)
+      unify_type(type_of_then, type_of_else, instruction)
+      instruction.type = type_of_then
+    end
+
+    def analyze_push_arg(instruction)
+      type = scope.fetch(:parameter_types).fetch(instruction.index)
+      @stack << type
+      instruction.type = type
+    end
+
+    def analyze_push_array(instruction)
+      members = @stack.pop(instruction.size)
+      if members.any?(NilType)
+        members.map! do |type|
+          if type == NilType
+            NillableType.new(TypeVariable.new(self))
+          else
+            NillableType.new(type)
           end
         end
-        members.each_cons(2) do |a, b|
-          unify_type(a, b, exp)
-        end
-        member_type = members.first || TypeVariable.new(self)
-        member_type.non_generic!
-        type_of_array = AryType.new(member_type)
-        @stack << type_of_array
-        exp.type = type_of_array
-      when PushConstInstruction
-        klass = @classes[exp.name]
-        @stack << klass
-        exp.type = klass
-      when ClassInstruction
-        klass = @classes[exp.name] = ClassType.new(exp.name, {})
-        exp.type = klass
-      else
-        raise "unknown expression: #{exp.inspect}"
       end
+      members.each_cons(2) do |a, b|
+        unify_type(a, b, instruction)
+      end
+      member_type = members.first || TypeVariable.new(self)
+      member_type.non_generic!
+      type_of_array = AryType.new(member_type)
+      @stack << type_of_array
+      instruction.type = type_of_array
+    end
+
+    def analyze_push_const(instruction)
+      klass = @classes[instruction.name]
+      @stack << klass
+      instruction.type = klass
+    end
+
+    def analyze_push_false(instruction)
+      @stack << BoolType
+      instruction.type = BoolType
+    end
+
+    def analyze_push_int(instruction)
+      @stack << IntType
+      instruction.type = IntType
+    end
+
+    def analyze_push_nil(instruction)
+      @stack << NilType
+      instruction.type = NilType
+    end
+
+    def analyze_push_str(instruction)
+      @stack << StrType
+      instruction.type = StrType
+    end
+
+    def analyze_push_true(instruction)
+      @stack << BoolType
+      instruction.type = BoolType
+    end
+
+    def analyze_push_var(instruction)
+      type = retrieve_var(instruction.name)
+      raise UndefinedVariable, "undefined variable #{instruction.name.inspect}" unless type
+
+      @stack << type
+      instruction.type = type
+    end
+
+    def analyze_set_var(instruction)
+      type = @stack.pop
+      if (existing_type = vars[instruction.name])
+        unify_type(existing_type, type, instruction)
+        type = existing_type
+      elsif type == NilType
+        type = NillableType.new(TypeVariable.new(self))
+      elsif instruction.nillable?
+        type = NillableType.new(type)
+      end
+      vars[instruction.name] = type
+      instruction.type = type
     end
 
     def retrieve_method(type, name)
-      return unless (exp = @methods.dig(type&.name, name))
+      return unless (type = @methods.dig(type&.name, name))
 
-      fresh_type(exp)
+      fresh_type(type)
     end
 
     def retrieve_var(name)
-      return unless (exp = vars[name])
+      return unless (type = vars[name])
 
-      fresh_type(exp)
+      fresh_type(type)
     end
 
-    def fresh_type(type_exp, env = {})
-      type_exp = type_exp.prune
-      case type_exp
+    def fresh_type(type, env = {})
+      type = type.prune
+      case type
       when TypeVariable
-        if type_exp.generic?
-          env[type_exp] ||= TypeVariable.new(self)
+        if type.generic?
+          env[type] ||= TypeVariable.new(self)
         else
-          type_exp
+          type
         end
       when TypeOperator
-        type_exp.dup.tap do |new_type|
-          new_type.types = type_exp.types.map { |t| fresh_type(t, env) }
+        type.dup.tap do |new_type|
+          new_type.types = type.types.map { |t| fresh_type(t, env) }
         end
       end
     end
 
-    def occurs_in_type?(type_var, type_exp)
-      type_exp = type_exp.prune
-      case type_exp
+    def occurs_in_type?(type_var, type)
+      type = type.prune
+      case type
       when TypeVariable
-        type_var == type_exp
+        type_var == type
       when TypeOperator
-        occurs_in_type_list?(type_var, type_exp.types)
+        occurs_in_type_list?(type_var, type.types)
       end
     end
 
