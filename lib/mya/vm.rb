@@ -39,58 +39,77 @@ class VM
   }.freeze
 
   def execute(instruction)
-    case instruction
-    when Compiler::PushIntInstruction, Compiler::PushStrInstruction
-      @stack << instruction.value
-    when Compiler::PushNilInstruction
-      @stack << nil
-    when Compiler::PushTrueInstruction
-      @stack << true
-    when Compiler::PushFalseInstruction
-      @stack << false
-    when Compiler::SetVarInstruction
-      vars[instruction.name] = @stack.pop
-    when Compiler::PushVarInstruction
-      @stack << vars.fetch(instruction.name)
-    when Compiler::PushArrayInstruction
-      elements = @stack.pop(instruction.size)
-      @stack << elements
-    when Compiler::DefInstruction
-      @methods[instruction.name] = instruction
-    when Compiler::CallInstruction
-      new_args = @stack.pop(instruction.arg_count)
-      if instruction.has_receiver?
-        receiver = @stack.pop
-        if receiver.respond_to?(instruction.name)
-          @stack << receiver.send(instruction.name, *new_args)
-          return
-        end
+    send("execute_#{instruction.instruction_name}", instruction)
+  end
+
+  def execute_def(instruction)
+    @methods[instruction.name] = instruction
+  end
+
+  def execute_call(instruction)
+    new_args = @stack.pop(instruction.arg_count)
+
+    if instruction.has_receiver?
+      receiver = @stack.pop or raise(ArgumentError, 'No receiver')
+      if receiver.respond_to?(instruction.name)
+        @stack << receiver.send(instruction.name, *new_args)
+        return
       end
-      if BUILT_IN_METHODS.key?(instruction.name)
-        @stack << if (built_in_method = BUILT_IN_METHODS[instruction.name])
-                    built_in_method.call(*new_args, io: @io)
-                  else
-                    new_args.first.send(instruction.name, *new_args[1..])
-                  end
-      else
-        method = @methods[instruction.name]
-        raise NoMethodError, "Undefined method #{instruction.name}" unless method
-        push_frame(instructions: method.body, return_index: @index, with_scope: true)
-        @scope_stack << { args: new_args, vars: {} }
-      end
-    when Compiler::PushArgInstruction
-      @stack << args[instruction.index]
-    when Compiler::IfInstruction
-      condition = @stack.pop
-      body = if condition
-        instruction.if_true
-      else
-        instruction.if_false
-      end
-      push_frame(instructions: body, return_index: @index)
-    else
-      raise "Unknown instruction: #{instruction.inspect}"
     end
+
+    if (built_in_method = BUILT_IN_METHODS[instruction.name])
+      @stack << built_in_method.call(*new_args, io: @io)
+      return
+    end
+
+    method = @methods[instruction.name]
+    raise NoMethodError, "Undefined method #{instruction.name}" unless method
+
+    push_frame(instructions: method.body, return_index: @index, with_scope: true)
+    @scope_stack << { args: new_args, vars: {} }
+  end
+
+  def execute_if(instruction)
+    condition = @stack.pop
+    body = condition ? instruction.if_true : instruction.if_false
+    push_frame(instructions: body, return_index: @index)
+  end
+
+  def execute_push_arg(instruction)
+    @stack << args.fetch(instruction.index)
+  end
+
+  def execute_push_array(instruction)
+    ary = @stack.pop(instruction.size)
+    @stack << ary
+  end
+
+  def execute_push_false(_)
+    @stack << false
+  end
+
+  def execute_push_int(instruction)
+    @stack << instruction.value
+  end
+
+  def execute_push_nil(_)
+    @stack << nil
+  end
+
+  def execute_push_str(instruction)
+    @stack << instruction.value
+  end
+
+  def execute_push_true(_)
+    @stack << true
+  end
+
+  def execute_push_var(instruction)
+    @stack << vars.fetch(instruction.name)
+  end
+
+  def execute_set_var(instruction)
+    vars[instruction.name] = @stack.pop
   end
 
   def push_frame(instructions:, return_index:, with_scope: false)
