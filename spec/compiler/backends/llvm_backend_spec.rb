@@ -16,7 +16,7 @@ describe Compiler::Backends::LLVMBackend do
   end
 
   it 'evaluates nil' do
-    expect(execute('nil')).must_equal(nil)
+    expect(execute('nil')).must_be_nil
   end
 
   it 'evaluates booleans' do
@@ -85,7 +85,7 @@ describe Compiler::Backends::LLVMBackend do
       a = ["foo", "bar", nil]
       a.last
     CODE
-    expect(execute(code)).must_equal(nil)
+    expect(execute(code)).must_be_nil
 
     code = <<~CODE
       a = [1, 2, 3]
@@ -93,7 +93,7 @@ describe Compiler::Backends::LLVMBackend do
       c = [a, b, nil]
       c.last
     CODE
-    expect(execute(code)).must_equal(nil)
+    expect(execute(code)).must_be_nil
   end
 
   it 'evaluates method definitions' do
@@ -251,7 +251,7 @@ describe Compiler::Backends::LLVMBackend do
       a = nil
       a
     CODE
-    expect(execute(code)).must_equal(nil)
+    expect(execute(code)).must_be_nil
 
     code = <<~CODE
       a = nil

@@ -16,7 +16,7 @@ describe VM do
   end
 
   it 'evaluates nil' do
-    expect(execute('nil')).must_equal(nil)
+    expect(execute('nil')).must_be_nil
   end
 
   it 'evaluates booleans' do
@@ -224,7 +224,7 @@ describe VM do
       a = nil
       a
     CODE
-    expect(execute(code)).must_equal(nil)
+    expect(execute(code)).must_be_nil
 
     code = <<~CODE
       a = nil
