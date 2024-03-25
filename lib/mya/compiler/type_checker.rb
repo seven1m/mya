@@ -58,7 +58,7 @@ class Compiler
 
     attr_accessor :name, :types
 
-    def type_name = name
+    def name_for_method_lookup = name
 
     def to_s
       case types.size
@@ -138,22 +138,24 @@ class Compiler
   end
 
   class ClassType < TypeOperator
-    def initialize(name)
+    def initialize(class_name)
       super('class', [])
-      @name = name
+      @class_name = class_name.to_s
       @attributes = {}
     end
 
-    attr_reader :name, :attributes
+    attr_reader :class_name, :attributes
 
     def to_s
       attrs = attributes.map { |name, type| "#{name}:#{type}" }.join(', ')
-      "(class #{@name} #{attrs})"
+      "(class #{@class_name} #{attrs})"
     end
+
+    def name_for_method_lookup = @class_name
   end
 
   class ObjectType < TypeOperator
-    def initialize(name, klass)
+    def initialize(klass)
       super('object', [])
       @klass = klass
     end
@@ -161,12 +163,10 @@ class Compiler
     attr_reader :klass
 
     def to_s
-      "(object #{@klass.name})"
+      "(object #{@klass.class_name})"
     end
 
-    def type_name
-      @klass.name
-    end
+    def name_for_method_lookup = to_s
   end
 
   IntType = TypeOperator.new('int', [])
@@ -263,8 +263,8 @@ class Compiler
 
     def analyze_class(instruction)
       class_type = @classes[instruction.name] = ClassType.new(instruction.name)
-      object_type = ObjectType.new(instruction.name, class_type)
-      @methods[instruction.name] = {
+      object_type = ObjectType.new(class_type)
+      @methods[class_type.name_for_method_lookup] = {
         new: FunctionType.new(class_type, object_type)
       }
 
@@ -278,7 +278,7 @@ class Compiler
     def analyze_def(instruction)
       placeholder_var = TypeVariable.new(self)
       vars[instruction.name] = placeholder_var.non_generic!
-      @methods[current_class_type&.name][instruction.name] = placeholder_var.non_generic!
+      @methods[current_object_type&.name_for_method_lookup][instruction.name] = placeholder_var.non_generic!
 
       new_vars = {}
       parameter_types = instruction.params.map do |param|
@@ -293,8 +293,7 @@ class Compiler
       type_of_fun = FunctionType.new(*parameter_types, type_of_body)
       unify_type(type_of_fun, placeholder_var, instruction)
 
-      vars[instruction.name] = type_of_fun.non_generic!
-      @methods[current_class_type&.name][instruction.name] = type_of_fun.non_generic!
+      @methods[current_object_type&.name_for_method_lookup][instruction.name] = type_of_fun.non_generic!
       instruction.type = type_of_fun
 
       type_of_fun
@@ -403,7 +402,7 @@ class Compiler
     end
 
     def retrieve_method(type, name)
-      return unless (method = @methods.dig(type&.type_name, name))
+      return unless (method = @methods.dig(type&.name_for_method_lookup, name))
 
       fresh_type(method)
     end
@@ -531,7 +530,7 @@ class Compiler
     end
 
     def current_object_type
-      ObjectType.new('FIXME', current_class_type) if current_class_type
+      ObjectType.new(current_class_type) if current_class_type
     end
 
     def build_initial_methods
