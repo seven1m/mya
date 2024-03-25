@@ -22,6 +22,39 @@ describe Compiler do
     expect(compile('false')).must_equal_with_diff [{ type: 'bool', instruction: :push_false }]
   end
 
+  it 'compiles classes' do
+    code = <<~CODE
+      class Foo
+        def bar
+          @bar = 1
+        end
+      end
+      Foo.new.bar
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      {
+        type: '(class Foo @bar:int)',
+        instruction: :class,
+        name: :Foo,
+        body: [
+          {
+            type: '([(object Foo)] -> int)',
+            instruction: :def,
+            name: :bar,
+            params: [],
+            body: [
+              { type: 'int', instruction: :push_int, value: 1 },
+              { type: 'int', instruction: :set_ivar, name: :@bar, nillable: false },
+            ]
+          },
+        ]
+      },
+      { type: '(class Foo @bar:int)', instruction: :push_const, name: :Foo },
+      { type: '(object Foo)', instruction: :call, name: :new, has_receiver: true, arg_count: 0 },
+      { type: 'int', instruction: :call, name: :bar, has_receiver: true, arg_count: 0 }
+    ]
+  end
+
   it 'compiles variables set and get' do
     expect(compile('a = 1; a')).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },

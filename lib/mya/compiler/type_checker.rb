@@ -58,6 +58,8 @@ class Compiler
 
     attr_accessor :name, :types
 
+    def type_name = name
+
     def to_s
       case types.size
       when 0
@@ -136,14 +138,34 @@ class Compiler
   end
 
   class ClassType < TypeOperator
-    def initialize(name, attributes)
+    def initialize(name)
       super('class', [])
       @name = name
-      @attributes = attributes
+      @attributes = {}
     end
 
+    attr_reader :name, :attributes
+
     def to_s
-      "(class #{@name})"
+      attrs = attributes.map { |name, type| "#{name}:#{type}" }.join(', ')
+      "(class #{@name} #{attrs})"
+    end
+  end
+
+  class ObjectType < TypeOperator
+    def initialize(name, klass)
+      super('object', [])
+      @klass = klass
+    end
+
+    attr_reader :klass
+
+    def to_s
+      "(object #{@klass.name})"
+    end
+
+    def type_name
+      @klass.name
     end
   end
 
@@ -161,7 +183,7 @@ class Compiler
 
     def initialize
       @stack = []
-      @scope_stack = [{ vars: {} }]
+      @scope_stack = [{ vars: {}, class_type: nil }]
       @classes = {}
       @calls_to_unify = []
       @methods = build_initial_methods
@@ -206,17 +228,17 @@ class Compiler
     end
 
     def analyze_call(instruction)
-      type_of_args = @stack.pop(instruction.arg_count)
+      type_of_args = pop(instruction.arg_count)
 
       if instruction.has_receiver?
-        type_of_receiver = @stack.pop or raise('instructionected receiver on stack but got nil')
+        type_of_receiver = pop&.prune or raise('instructionected receiver on stack but got nil')
         type_of_args.unshift(type_of_receiver)
       end
 
       type_of_return = TypeVariable.new(self)
       type_of_fun = FunctionType.new(*type_of_args, type_of_return)
 
-      if type_of_receiver&.prune.is_a?(TypeVariable)
+      if type_of_receiver.is_a?(TypeVariable)
         # We cannot unify yet, since we don't know the receiver type.
         # Save this call for later unification.
         @calls_to_unify << { type_of_receiver:, type_of_fun:, instruction: }
@@ -234,27 +256,37 @@ class Compiler
 
     def retrieve_method_and_analyze_call(type_of_receiver:, type_of_fun:, instruction:)
       known_type = retrieve_method(type_of_receiver, instruction.name)
-      raise UndefinedMethod, "undefined method #{instruction.name}" unless known_type
+      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver}" unless known_type
 
       unify_type(known_type, type_of_fun, instruction)
     end
 
     def analyze_class(instruction)
-      klass = @classes[instruction.name] = ClassType.new(instruction.name, {})
-      instruction.type = klass
+      class_type = @classes[instruction.name] = ClassType.new(instruction.name)
+      object_type = ObjectType.new(instruction.name, class_type)
+      @methods[instruction.name] = {
+        new: FunctionType.new(class_type, object_type)
+      }
+
+      @scope_stack << { vars: {}, class_type: }
+      analyze_instruction(instruction.body)
+      @scope_stack.pop
+
+      instruction.type = class_type
     end
 
     def analyze_def(instruction)
       placeholder_var = TypeVariable.new(self)
       vars[instruction.name] = placeholder_var.non_generic!
-      @methods[nil][instruction.name] = placeholder_var.non_generic!
+      @methods[current_class_type&.name][instruction.name] = placeholder_var.non_generic!
 
       new_vars = {}
       parameter_types = instruction.params.map do |param|
         new_vars[param] = TypeVariable.new(self).non_generic!
       end
+      parameter_types.unshift(current_object_type) if current_object_type
 
-      @scope_stack << { parameter_types:, vars: new_vars }
+      @scope_stack << scope.merge(parameter_types:, vars: new_vars)
       type_of_body = analyze_instruction(instruction.body)
       @scope_stack.pop
 
@@ -262,14 +294,14 @@ class Compiler
       unify_type(type_of_fun, placeholder_var, instruction)
 
       vars[instruction.name] = type_of_fun.non_generic!
-      @methods[nil][instruction.name] = type_of_fun.non_generic!
+      @methods[current_class_type&.name][instruction.name] = type_of_fun.non_generic!
       instruction.type = type_of_fun
 
       type_of_fun
     end
 
     def analyze_if(instruction)
-      condition = @stack.pop
+      condition = pop
       type_of_then = analyze_instruction(instruction.if_true)
       type_of_else = analyze_instruction(instruction.if_false)
       unify_type(type_of_then, type_of_else, instruction)
@@ -283,7 +315,7 @@ class Compiler
     end
 
     def analyze_push_array(instruction)
-      members = @stack.pop(instruction.size)
+      members = pop(instruction.size)
       if members.any?(NilType)
         members.map! do |type|
           if type == NilType
@@ -342,8 +374,22 @@ class Compiler
       instruction.type = type
     end
 
+    def analyze_set_ivar(instruction)
+      type = pop
+      if (existing_type = vars[instruction.name])
+        unify_type(existing_type, type, instruction)
+        type = existing_type
+      elsif type == NilType
+        type = NillableType.new(TypeVariable.new(self))
+      elsif instruction.nillable?
+        type = NillableType.new(type)
+      end
+      current_class_type.attributes[instruction.name] = type
+      instruction.type = type
+    end
+
     def analyze_set_var(instruction)
-      type = @stack.pop
+      type = pop
       if (existing_type = vars[instruction.name])
         unify_type(existing_type, type, instruction)
         type = existing_type
@@ -357,9 +403,9 @@ class Compiler
     end
 
     def retrieve_method(type, name)
-      return unless (type = @methods.dig(type&.name, name))
+      return unless (method = @methods.dig(type&.type_name, name))
 
-      fresh_type(type)
+      fresh_type(method)
     end
 
     def retrieve_var(name)
@@ -466,12 +512,26 @@ class Compiler
       raise TypeClash, message
     end
 
+    def pop(count = nil)
+      (count ? @stack.pop(count) : @stack.pop).tap do |value|
+        raise 'Nothing on stack!' unless value
+      end
+    end
+
     def scope
       @scope_stack.last or raise('No scope!')
     end
 
     def vars
       scope.fetch(:vars)
+    end
+
+    def current_class_type
+      scope.fetch(:class_type)
+    end
+
+    def current_object_type
+      ObjectType.new('FIXME', current_class_type) if current_class_type
     end
 
     def build_initial_methods
@@ -496,7 +556,9 @@ class Compiler
           '<<': FunctionType.new(array, array_type, array),
           push: FunctionType.new(array, array_type, array_type),
         },
-      }
+      }.tap do |hash|
+        hash.default_proc = proc { |hash, key| hash[key] = {} }
+      end
     end
   end
 end

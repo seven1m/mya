@@ -15,7 +15,7 @@ class Compiler
     def type!
       return @pruned_type.to_s if @pruned_type
 
-      raise "No type set!" unless @type
+      raise "No type set on #{inspect}" unless @type
 
       pruned = @type.prune
       raise TypeError, "Not enough information to infer type of #{inspect}" if pruned.is_a?(TypeVariable)

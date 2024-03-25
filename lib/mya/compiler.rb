@@ -127,7 +127,7 @@ class Compiler
       instruction = ClassInstruction.new(name, line: node.location.start_line)
       instructions << instruction
       class_instructions = []
-      transform(node.body, class_instructions)
+      transform(node.body || Prism::NilNode.new(node.location), class_instructions)
       instruction.body = class_instructions
       instruction
     when Prism::InstanceVariableWriteNode
