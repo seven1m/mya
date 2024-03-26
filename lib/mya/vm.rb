@@ -1,13 +1,46 @@
 class VM
+  class ClassType
+    def initialize(name)
+      @name = name
+      @methods = {}
+    end
+
+    attr_reader :methods
+
+    attr_reader :name
+
+    def new
+      ObjectType.new(self)
+    end
+  end
+
+  class ObjectType
+    def initialize(klass)
+      @klass = klass
+      @ivars = {}
+    end
+
+    attr_reader :klass
+
+    def methods = klass.methods
+
+    def set_ivar(name, value)
+      @ivars[name] = value
+    end
+  end
+
+  MainClass = ClassType.new('main')
+  MainObject = ObjectType.new(MainClass)
+
   def initialize(instructions, io: $stdout)
     @instructions = instructions
     @stack = []
     @frames = [
       { instructions:, return_index: nil }
     ]
-    @scope_stack = [{ args: [], vars: {} }]
+    @scope_stack = [{ args: [], vars: {}, self_obj: MainObject }]
     @if_depth = 0
-    @methods = {}
+    @classes = {}
     @io = io
   end
 
@@ -42,8 +75,14 @@ class VM
     send("execute_#{instruction.instruction_name}", instruction)
   end
 
+  def execute_class(instruction)
+    klass = @classes[instruction.name] = ClassType.new(instruction.name)
+    push_frame(instructions: instruction.body, return_index: @index, with_scope: true)
+    @scope_stack << { vars: {}, self_obj: klass }
+  end
+
   def execute_def(instruction)
-    @methods[instruction.name] = instruction
+    self_obj.methods[instruction.name] = instruction.body
   end
 
   def execute_call(instruction)
@@ -51,8 +90,14 @@ class VM
 
     if instruction.has_receiver?
       receiver = @stack.pop or raise(ArgumentError, 'No receiver')
-      if receiver.respond_to?(instruction.name)
-        @stack << receiver.send(instruction.name, *new_args)
+      name = instruction.name
+      if receiver.respond_to?(name)
+        @stack << receiver.send(name, *new_args)
+        return
+      end
+      if receiver.methods.key?(name)
+        push_frame(instructions: receiver.methods[name], return_index: @index, with_scope: true)
+        @scope_stack << { args: new_args, vars: {}, self_obj: receiver }
         return
       end
     end
@@ -62,11 +107,11 @@ class VM
       return
     end
 
-    method = @methods[instruction.name]
-    raise NoMethodError, "Undefined method #{instruction.name}" unless method
+    method_body = self_obj.methods[instruction.name]
+    raise NoMethodError, "Undefined method #{instruction.name}" unless method_body
 
-    push_frame(instructions: method.body, return_index: @index, with_scope: true)
-    @scope_stack << { args: new_args, vars: {} }
+    push_frame(instructions: method_body, return_index: @index, with_scope: true)
+    @scope_stack << { args: new_args, vars: {}, self_obj: }
   end
 
   def execute_if(instruction)
@@ -82,6 +127,10 @@ class VM
   def execute_push_array(instruction)
     ary = @stack.pop(instruction.size)
     @stack << ary
+  end
+
+  def execute_push_const(instruction)
+    @stack << @classes[instruction.name]
   end
 
   def execute_push_false(_)
@@ -112,6 +161,12 @@ class VM
     vars[instruction.name] = @stack.pop
   end
 
+  def execute_set_ivar(instruction)
+    # TODO: Need `used` argument to know whether to leave value on stack or not.
+    value = @stack.last
+    self_obj.set_ivar(instruction.name, value)
+  end
+
   def push_frame(instructions:, return_index:, with_scope: false)
     @frames << { instructions:, return_index:, with_scope: }
     @index = 0
@@ -119,6 +174,10 @@ class VM
 
   def scope
     @scope_stack.last
+  end
+
+  def self_obj
+    scope.fetch(:self_obj)
   end
 
   def vars

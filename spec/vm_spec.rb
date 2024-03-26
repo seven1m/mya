@@ -24,6 +24,18 @@ describe VM do
     expect(execute('false')).must_equal(false)
   end
 
+  it 'evaluates classes' do
+    code = <<~CODE
+      class Foo
+        def bar
+          @bar = 1
+        end
+      end
+      Foo.new.bar
+    CODE
+    expect(execute(code)).must_equal(1)
+  end
+
   it 'evaluates variables set and get' do
     expect(execute('a = 1; a')).must_equal(1)
   end
