@@ -467,44 +467,73 @@ class Compiler
       b = b.prune
       case a
       when TypeVariable
-        if a == b
-          # noop
-        elsif b.is_a?(TypeOperator) && b.contains?(a)
-          raise RecursiveUnification, "recursive unification: #{b} contains #{a}"
-        else
-          a.instance = b
-        end
+        unify_type_variable(a, b, instruction)
       when TypeOperator
-        case b
-        when TypeVariable
-          unify_type(b, a, instruction)
-        when TypeOperator
-          if a.name == 'union' && (selected = a.select_type(b))
-            unify_type(selected, b, instruction)
-          elsif a.name == 'nillable'
-            if b.name == 'nil'
-              # noop
-            elsif b.name == 'nillable'
-              unify_type(a.types.first, b.types.first, instruction)
-            elsif a.types.first.is_a?(TypeVariable)
-              unify_type(a.types.first, b)
-            else
-              raise_type_clash_error(a, b, instruction)
-            end
-          elsif a.name == b.name && a.types.size == b.types.size
-            begin
-              unify_args(a.types, b.types, instruction)
-            rescue TypeClash
-              raise_type_clash_error(a, b, instruction)
-            end
-          else
-            raise_type_clash_error(a, b, instruction)
-          end
-        else
-          raise "Unknown type: #{b.inspect}"
-        end
+        unify_type_operator(a, b, instruction)
       else
         raise "Unknown type: #{a.inspect}"
+      end
+    end
+
+    def unify_type_variable(a, b, instruction)
+      return if a == b
+
+      if b.is_a?(TypeOperator) && b.contains?(a)
+        raise RecursiveUnification, "recursive unification: #{b} contains #{a}"
+      else
+        a.instance = b
+      end
+    end
+
+    def unify_type_operator(a, b, instruction)
+      case b
+      when TypeVariable
+        unify_type_variable(b, a, instruction)
+      when TypeOperator
+        case a
+        when UnionType
+          unify_union_type(a, b, instruction)
+        when NillableType
+          unify_nillable_type(a, b, instruction)
+        else
+          unify_type_operator_with_type_operator(a, b, instruction)
+        end
+      else
+        raise "Unknown type: #{b.inspect}"
+      end
+    end
+
+    def unify_nillable_type(a, b, instruction)
+      return if b.name == 'nil'
+
+      if b.is_a?(NillableType)
+        unify_type(a.types.first, b.types.first, instruction)
+      elsif a.types.first.is_a?(TypeVariable)
+        unify_type(a.types.first, b)
+      else
+        raise_type_clash_error(a, b, instruction)
+      end
+    end
+
+    def unify_union_type(a, b, instruction)
+      unless (selected = a.select_type(b))
+        raise_type_clash_error(a, b, instruction)
+      end
+
+      unify_type(selected, b, instruction)
+    end
+
+    def unify_type_operator_with_type_operator(a, b, instruction)
+      unless a.name == b.name && a.types.size == b.types.size
+        raise_type_clash_error(a, b, instruction)
+      end
+
+      begin
+        unify_args(a.types, b.types, instruction)
+      rescue TypeClash
+        # We want to produce an error message for the whole instruction, e.g.
+        # call, array, etc. -- not for an individual type inside.
+        raise_type_clash_error(a, b, instruction)
       end
     end
 
