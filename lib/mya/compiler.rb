@@ -25,125 +25,159 @@ class Compiler
   def compile
     @scope_stack = [{ vars: {} }]
     @instructions = []
-    transform(@ast, @instructions)
+    transform(@ast)
     type_check
     @instructions
   end
 
   private
 
-  def transform(node, instructions)
-    case node
-    when Prism::ProgramNode
-      transform(node.statements, instructions)
-    when Prism::IntegerNode
-      instruction = PushIntInstruction.new(node.value, line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::StringNode
-      instruction = PushStrInstruction.new(node.unescaped, line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::TrueNode
-      instruction = PushTrueInstruction.new(line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::FalseNode
-      instruction = PushFalseInstruction.new(line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::NilNode
-      instruction = PushNilInstruction.new(line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::StatementsNode
-      node.body.map do |n|
-        transform(n, instructions)
-      end.last
-    when Prism::LocalVariableWriteNode
-      value_instruction = transform(node.value, instructions)
-      directives = @directives.dig(node.location.start_line, node.name) || []
-      nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
-      instruction = SetVarInstruction.new(node.name, nillable:, line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::LocalVariableReadNode
-      instruction = PushVarInstruction.new(node.name, line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::DefNode
-      @scope_stack << { vars: {} }
-      params = (node.parameters&.requireds || [])
-      instruction = DefInstruction.new(node.name, line: node.location.start_line)
-      instructions << instruction
-      def_instructions = []
-      params.each_with_index do |param, index|
-        i1 = PushArgInstruction.new(index, line: node.location.start_line)
-        def_instructions << i1
-        i2 = SetVarInstruction.new(param.name, nillable: false, line: node.location.start_line)
-        def_instructions << i2
-        instruction.params << param.name
-      end
-      return_instruction = transform(node.body, def_instructions)
-      instruction.body = def_instructions
-      @scope_stack.pop
-      instruction
-    when Prism::CallNode
-      transform(node.receiver, instructions) if node.receiver
-      args = (node.arguments&.arguments || [])
-      arg_instructions = args.map do |arg|
-        transform(arg, instructions)
-      end
-      instruction = CallInstruction.new(
-        node.name,
-        has_receiver: !!node.receiver,
-        arg_count: args.size,
-        arg_instructions:,
-        line: node.location.start_line
-      )
-      instructions << instruction
-      instruction
-    when Prism::IfNode
-      transform(node.predicate, instructions)
-      instruction = IfInstruction.new(line: node.location.start_line)
-      instructions << instruction
-      instruction.if_true = []
-      true_result = transform(node.statements, instruction.if_true)
-      instruction.if_false = []
-      false_result = transform(node.consequent, instruction.if_false)
-      instruction
-    when Prism::ElseNode
-      transform(node.statements, instructions)
-    when Prism::ArrayNode
-      node.elements.each do |element|
-        transform(element, instructions)
-      end
-      instruction = PushArrayInstruction.new(node.elements.size, line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::ClassNode
-      name = node.constant_path.name
-      body = node.body
-      instruction = ClassInstruction.new(name, line: node.location.start_line)
-      instructions << instruction
-      class_instructions = []
-      transform(node.body || Prism::NilNode.new(node.location), class_instructions)
-      instruction.body = class_instructions
-      instruction
-    when Prism::InstanceVariableWriteNode
-      value_instruction = transform(node.value, instructions)
-      directives = @directives.dig(node.location.start_line, node.name) || []
-      nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
-      instruction = SetInstanceVarInstruction.new(node.name, nillable:, line: node.location.start_line)
-      instructions << instruction
-      instruction
-    when Prism::ConstantReadNode
-      instruction = PushConstInstruction.new(node.name, line: node.location.start_line)
-      instructions << instruction
-      instruction
-    else
-      raise "unknown node: #{node.inspect}"
+  def transform(node)
+    send("transform_#{node.type}", node)
+  end
+
+  def transform_array_node(node)
+    node.elements.each do |element|
+      transform(element)
     end
+    instruction = PushArrayInstruction.new(node.elements.size, line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_call_node(node)
+    transform(node.receiver) if node.receiver
+    args = (node.arguments&.arguments || [])
+    args.each do |arg|
+      transform(arg)
+    end
+    arg_instructions = @instructions.last(args.size)
+    instruction = CallInstruction.new(
+      node.name,
+      has_receiver: !!node.receiver,
+      arg_count: args.size,
+      arg_instructions:,
+      line: node.location.start_line
+    )
+    @instructions << instruction
+  end
+
+  def transform_class_node(node)
+    name = node.constant_path.name
+    body = node.body
+    instruction = ClassInstruction.new(name, line: node.location.start_line)
+    @instructions << instruction
+    class_instructions = []
+    with_instructions_array(class_instructions) do
+      transform(node.body || Prism::NilNode.new(node.location))
+    end
+    instruction.body = class_instructions
+  end
+
+  def transform_constant_read_node(node)
+    instruction = PushConstInstruction.new(node.name, line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_def_node(node)
+    @scope_stack << { vars: {} }
+    params = (node.parameters&.requireds || [])
+    instruction = DefInstruction.new(node.name, line: node.location.start_line)
+    @instructions << instruction
+    def_instructions = []
+    params.each_with_index do |param, index|
+      i1 = PushArgInstruction.new(index, line: node.location.start_line)
+      def_instructions << i1
+      i2 = SetVarInstruction.new(param.name, nillable: false, line: node.location.start_line)
+      def_instructions << i2
+      instruction.params << param.name
+    end
+    with_instructions_array(def_instructions) do
+      transform(node.body)
+    end
+    instruction.body = def_instructions
+    @scope_stack.pop
+  end
+
+  def transform_else_node(node)
+    transform(node.statements)
+  end
+
+  def transform_false_node(node)
+    instruction = PushFalseInstruction.new(line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_if_node(node)
+    transform(node.predicate)
+    instruction = IfInstruction.new(line: node.location.start_line)
+    @instructions << instruction
+    instruction.if_true = []
+    with_instructions_array(instruction.if_true) do
+      transform(node.statements)
+    end
+    instruction.if_false = []
+    with_instructions_array(instruction.if_false) do
+      transform(node.consequent)
+    end
+  end
+
+  def transform_instance_variable_write_node(node)
+    transform(node.value)
+    directives = @directives.dig(node.location.start_line, node.name) || []
+    nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
+    instruction = SetInstanceVarInstruction.new(node.name, nillable:, line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_integer_node(node)
+    instruction = PushIntInstruction.new(node.value, line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_local_variable_read_node(node)
+    instruction = PushVarInstruction.new(node.name, line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_local_variable_write_node(node)
+    transform(node.value)
+    directives = @directives.dig(node.location.start_line, node.name) || []
+    nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
+    instruction = SetVarInstruction.new(node.name, nillable:, line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_nil_node(node)
+    instruction = PushNilInstruction.new(line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_program_node(node)
+    transform(node.statements)
+  end
+
+  def transform_statements_node(node)
+    node.body.each do |n|
+      transform(n)
+    end
+  end
+
+  def transform_string_node(node)
+    instruction = PushStrInstruction.new(node.unescaped, line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def transform_true_node(node)
+    instruction = PushTrueInstruction.new(line: node.location.start_line)
+    @instructions << instruction
+  end
+
+  def with_instructions_array(array)
+    array_was = @instructions
+    @instructions = array
+    yield
+  ensure
+    @instructions = array_was
   end
 
   def type_check
