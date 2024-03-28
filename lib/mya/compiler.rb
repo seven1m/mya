@@ -50,12 +50,10 @@ class Compiler
     args.each do |arg|
       transform(arg)
     end
-    arg_instructions = @instructions.last(args.size)
     instruction = CallInstruction.new(
       node.name,
       has_receiver: !!node.receiver,
       arg_count: args.size,
-      arg_instructions:,
       line: node.location.start_line
     )
     @instructions << instruction

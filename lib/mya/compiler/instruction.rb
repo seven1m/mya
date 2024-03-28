@@ -6,14 +6,14 @@ class Compiler
 
     attr_reader :line
 
-    attr_accessor :type
+    attr_writer :type
 
     def to_h
       raise NotImplementedError, __method__
     end
 
     def type!
-      return @pruned_type.to_s if @pruned_type
+      return @pruned_type if @pruned_type
 
       raise "No type set on #{inspect}" unless @type
 
@@ -208,15 +208,14 @@ class Compiler
   end
 
   class CallInstruction < Instruction
-    def initialize(name, has_receiver:, arg_count:, arg_instructions:, line:)
+    def initialize(name, has_receiver:, arg_count:, line:)
       super(line:)
       @name = name
       @has_receiver = has_receiver
       @arg_count = arg_count
-      @arg_instructions = arg_instructions
     end
 
-    attr_reader :name, :has_receiver, :arg_count, :arg_instructions
+    attr_reader :name, :has_receiver, :arg_count
 
     def instruction_name
       :call
@@ -263,7 +262,7 @@ class Compiler
     end
 
     def return_type
-      (@pruned_type || @type.prune).types.last.name.to_sym
+      (@pruned_type || @type.prune).types.last
     end
 
     def to_h

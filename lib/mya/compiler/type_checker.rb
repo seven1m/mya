@@ -76,7 +76,7 @@ class Compiler
     end
 
     def inspect
-      "#<TypeOperator name=#{name} types=#{types.join(', ')}>"
+      "#<TypeOperator name=#{name} types=[#{types.join(', ')}]>"
     end
 
     def non_generic!
@@ -89,6 +89,8 @@ class Compiler
         new_type.types = types.map(&:prune)
       end
     end
+
+    def evaluated_type = self
   end
 
   class FunctionType < TypeOperator
@@ -103,7 +105,17 @@ class Compiler
     end
 
     def inspect
-      "#<FunctionType #{types.map(&:inspect).join(', ')}>"
+      "#<FunctionType types=[#{types.map(&:inspect).join(', ')}]>"
+    end
+
+    def evaluated_type = types.last
+  end
+
+  # This just exists for debugging purposes.
+  # We could easily use FunctionType, but would lose some context when puts debugging. :-)
+  class CallType < FunctionType
+    def inspect
+      super.sub('FunctionType', 'CallType')
     end
   end
 
@@ -236,20 +248,20 @@ class Compiler
       end
 
       type_of_return = TypeVariable.new(self)
-      type_of_call = FunctionType.new(*type_of_args, type_of_return)
+      type_of_call = CallType.new(*type_of_args, type_of_return)
 
       if type_of_receiver.is_a?(TypeVariable)
         # We cannot unify yet, since we don't know the receiver type.
         # Save this call for later unification.
         @calls_to_unify << { type_of_receiver:, type_of_call:, instruction: }
-        instruction.type = type_of_return
+        instruction.type = type_of_call
         @stack << type_of_return
         return type_of_return
       end
 
       retrieve_method_and_analyze_call(type_of_receiver:, type_of_call:, instruction:)
 
-      instruction.type = type_of_return
+      instruction.type = type_of_call
       @stack << type_of_return
       type_of_return
     end

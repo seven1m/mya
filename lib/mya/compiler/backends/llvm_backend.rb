@@ -54,7 +54,7 @@ class Compiler
         @index = 0
         build_function(@entry, @instructions)
         @lib.link_into(@module)
-        @module.dump if @dump || !@module.valid?
+        #@module.dump if @dump || !@module.valid?
         @module.verify!
       end
 
@@ -181,7 +181,7 @@ class Compiler
       end
 
       def llvm_type(type)
-        case type.to_sym
+        case type.evaluated_type.to_sym
         when :bool
           LLVM::Int1.type
         when :int
@@ -192,6 +192,8 @@ class Compiler
       end
 
       def llvm_type_to_ruby(value, type)
+        type = type.types.last if type.is_a?(Compiler::CallType)
+
         case type.to_sym
         when :bool, :int, :nil
           read_llvm_type_as_ruby(value, type)
@@ -244,7 +246,7 @@ class Compiler
       def build_array(builder, instruction)
         elements = @stack.pop(instruction.size)
         array_type = instruction.type!
-        element_type = llvm_type(array_type.types.first.to_s)
+        element_type = llvm_type(array_type.types.first)
         array = ArrayBuilder.new(builder:, mod: @module, element_type:, elements:)
         array.to_ptr
       end
@@ -281,7 +283,7 @@ class Compiler
           '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
           'puts': -> (builder:, args:, instruction:) do
             arg = args.first
-            arg_type = instruction.arg_instructions.first.type!.to_sym
+            arg_type = instruction.type!.types.first.to_sym
             case arg_type
             when :int
               builder.call(fn_puts_int, arg)
