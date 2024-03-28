@@ -231,34 +231,34 @@ class Compiler
       type_of_args = pop(instruction.arg_count)
 
       if instruction.has_receiver?
-        type_of_receiver = pop&.prune or raise('instructionected receiver on stack but got nil')
+        type_of_receiver = pop&.prune or raise('expected receiver on stack but got nil')
         type_of_args.unshift(type_of_receiver)
       end
 
       type_of_return = TypeVariable.new(self)
-      type_of_fun = FunctionType.new(*type_of_args, type_of_return)
+      type_of_call = FunctionType.new(*type_of_args, type_of_return)
 
       if type_of_receiver.is_a?(TypeVariable)
         # We cannot unify yet, since we don't know the receiver type.
         # Save this call for later unification.
-        @calls_to_unify << { type_of_receiver:, type_of_fun:, instruction: }
+        @calls_to_unify << { type_of_receiver:, type_of_call:, instruction: }
         instruction.type = type_of_return
         @stack << type_of_return
         return type_of_return
       end
 
-      retrieve_method_and_analyze_call(type_of_receiver:, type_of_fun:, instruction:)
+      retrieve_method_and_analyze_call(type_of_receiver:, type_of_call:, instruction:)
 
       instruction.type = type_of_return
       @stack << type_of_return
       type_of_return
     end
 
-    def retrieve_method_and_analyze_call(type_of_receiver:, type_of_fun:, instruction:)
-      known_type = retrieve_method(type_of_receiver, instruction.name)
-      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver}" unless known_type
+    def retrieve_method_and_analyze_call(type_of_receiver:, type_of_call:, instruction:)
+      type_of_fun = retrieve_method(type_of_receiver, instruction.name)
+      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver}" unless type_of_fun
 
-      unify_type(known_type, type_of_fun, instruction)
+      unify_type(type_of_fun, type_of_call, instruction)
     end
 
     def analyze_class(instruction)
