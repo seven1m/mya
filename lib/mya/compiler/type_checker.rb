@@ -90,6 +90,21 @@ class Compiler
       end
     end
 
+    def contains?(other_type)
+      raise 'expected TypeVariable' unless other_type.is_a?(TypeVariable)
+
+      types.any? do |candidate|
+        case candidate
+        when TypeVariable
+          candidate == other_type
+        when TypeOperator
+          candidate.contains?(other_type)
+        else
+          raise "Unexpected type: #{candidate.inspect}"
+        end
+      end
+    end
+
     def evaluated_type = self
   end
 
@@ -126,6 +141,12 @@ class Compiler
 
     def to_s
       "(#{types.join(' | ')})"
+    end
+
+    def select_type(other_type)
+      types.detect do |candidate|
+        candidate.name == other_type.name && candidate.types.size == other_type.types.size
+      end
     end
   end
 
@@ -441,29 +462,15 @@ class Compiler
       end
     end
 
-    def occurs_in_type?(type_var, type)
-      type = type.prune
-      case type
-      when TypeVariable
-        type_var == type
-      when TypeOperator
-        occurs_in_type_list?(type_var, type.types)
-      end
-    end
-
-    def occurs_in_type_list?(type_var, list)
-      list.any? { |t| occurs_in_type?(type_var, t) }
-    end
-
     def unify_type(a, b, instruction = nil)
       a = a.prune
       b = b.prune
       case a
       when TypeVariable
-        if occurs_in_type?(a, b)
-          unless a == b
-            raise RecursiveUnification, "recursive unification: #{b} contains #{a}"
-          end
+        if a == b
+          # noop
+        elsif b.is_a?(TypeOperator) && b.contains?(a)
+          raise RecursiveUnification, "recursive unification: #{b} contains #{a}"
         else
           a.instance = b
         end
@@ -472,8 +479,8 @@ class Compiler
         when TypeVariable
           unify_type(b, a, instruction)
         when TypeOperator
-          if a.name == 'union' && (matching = a.types.detect { |t| t.name == b.name && t.types.size == b.types.size })
-            unify_type(matching, b, instruction)
+          if a.name == 'union' && (selected = a.select_type(b))
+            unify_type(selected, b, instruction)
           elsif a.name == 'nillable'
             if b.name == 'nil'
               # noop
