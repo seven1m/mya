@@ -70,30 +70,18 @@ class Compiler
   end
 
   class PushTrueInstruction < Instruction
-    def initialize(line:)
-      super(line:)
-    end
-
     def instruction_name
       :push_true
     end
   end
 
   class PushFalseInstruction < Instruction
-    def initialize(line:)
-      super(line:)
-    end
-
     def instruction_name
       :push_false
     end
   end
 
   class PushNilInstruction < Instruction
-    def initialize(line:)
-      super(line:)
-    end
-
     def instruction_name
       :push_nil
     end
@@ -229,10 +217,6 @@ class Compiler
   end
 
   class IfInstruction < Instruction
-    def initialize(line:)
-      super(line:)
-    end
-
     attr_accessor :if_true, :if_false
 
     def instruction_name
@@ -292,6 +276,12 @@ class Compiler
         name:,
         body: body.map(&:to_h)
       )
+    end
+  end
+
+  class PopInstruction < Instruction
+    def instruction_name
+      :pop
     end
   end
 end

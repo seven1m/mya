@@ -340,6 +340,10 @@ class Compiler
       instruction.type = type_of_then
     end
 
+    def analyze_pop(instruction)
+      instruction.type = NilType
+    end
+
     def analyze_push_arg(instruction)
       type = scope.fetch(:parameter_types).fetch(instruction.index)
       @stack << type
@@ -560,9 +564,15 @@ class Compiler
     end
 
     def pop(count = nil)
-      (count ? @stack.pop(count) : @stack.pop).tap do |value|
-        raise 'Nothing on stack!' unless value
+      if count
+        values = @stack.pop(count)
+        raise "Not enough values on stack! (Expected #{count} but got #{values.inspect})" unless values.size == count
+        return values
       end
+
+      value = @stack.pop
+      raise 'Nothing on stack!' unless value
+      value
     end
 
     def scope

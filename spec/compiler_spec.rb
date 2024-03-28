@@ -68,7 +68,8 @@ describe Compiler do
       { type: 'int', instruction: :push_int, value: 1 },
       { type: 'int', instruction: :set_var, name: :a, nillable: false },
       { type: 'int', instruction: :push_int, value: 2 },
-      { type: 'int', instruction: :set_var, name: :a, nillable: false }
+      { type: 'int', instruction: :set_var, name: :a, nillable: false },
+      { type: 'int', instruction: :push_var, name: :a }
     ]
   end
 
@@ -99,14 +100,17 @@ describe Compiler do
       { type: '(int array)', instruction: :set_var, name: :a, nillable: false },
       { type: '(int array)', instruction: :push_var, name: :a },
       { type: '([(int array)] -> int)', instruction: :call, name: :first, has_receiver: true, arg_count: 0 },
+      { type: 'nil', instruction: :pop },
       { type: '(str array)', instruction: :push_array, size: 0 },
       { type: '(str array)', instruction: :set_var, name: :b, nillable: false },
       { type: '(str array)', instruction: :push_var, name: :b },
       { type: 'str', instruction: :push_str, value: "foo" },
       { type: '([(str array), str] -> (str array))', instruction: :call, name: :<<, has_receiver: true, arg_count: 1, },
+      { type: 'nil', instruction: :pop },
       { type: '(str array)', instruction: :push_var, name: :b },
       { type: 'str', instruction: :push_str, value: "bar" },
       { type: '([(str array), str] -> (str array))', instruction: :call, name: :<<, has_receiver: true, arg_count: 1, },
+      { type: 'nil', instruction: :pop },
       { type: 'int', instruction: :push_int, value: 4 },
       { type: 'int', instruction: :push_int, value: 5 },
       { type: 'int', instruction: :push_int, value: 6 },
@@ -116,6 +120,7 @@ describe Compiler do
       { type: '(int array)', instruction: :push_var, name: :c },
       { type: '((int array) array)', instruction: :push_array, size: 2 },
       { type: '((int array) array)', instruction: :set_var, name: :d, nillable: false },
+      { type: '((int array) array)', instruction: :push_var, name: :d },
     ]
   end
 
@@ -180,6 +185,7 @@ describe Compiler do
         has_receiver: false,
         arg_count: 0,
       },
+      { type: 'nil', instruction: :pop },
       {
         type: '([] -> int)',
         instruction: :call,
@@ -234,6 +240,7 @@ describe Compiler do
       { type: 'str', instruction: :push_str, value: 'foo' },
       { type: 'int', instruction: :push_int, value: 1 },
       { type: '([str, int] -> str)', instruction: :call, name: :foo, has_receiver: false, arg_count: 2 },
+      { type: 'nil', instruction: :pop },
 
       { type: 'int', instruction: :push_int, value: 2 },
       { type: '([int] -> int)', instruction: :call, name: :bar, has_receiver: false, arg_count: 1 }
@@ -286,6 +293,7 @@ describe Compiler do
       { type: 'int', instruction: :push_int, value: 1 },
       { type: 'int', instruction: :push_int, value: 2 },
       { type: '([int, int] -> int)', instruction: :call, name: :+, has_receiver: true, arg_count: 1 },
+      { type: 'nil', instruction: :pop },
 
       { type: 'int', instruction: :push_int, value: 3 },
       { type: 'int', instruction: :push_int, value: 4 },
@@ -357,6 +365,7 @@ describe Compiler do
       { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
       { type: 'nil', instruction: :push_nil },
       { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
+      { type: '(nillable str)', instruction: :push_var, name: :a_or_nil },
     ]
 
     code = <<~CODE
@@ -368,6 +377,7 @@ describe Compiler do
       { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
       { type: 'str', instruction: :push_str, value: 'foo' },
       { type: '(nillable str)', instruction: :set_var, name: :a_or_nil, nillable: true },
+      { type: '(nillable str)', instruction: :push_var, name: :a_or_nil },
     ]
   end
 
@@ -381,6 +391,7 @@ describe Compiler do
       { type: '(nillable str)', instruction: :set_var, name: :a, nillable: true },
       { type: 'nil', instruction: :push_nil },
       { type: '(nillable str)', instruction: :set_var, name: :a, nillable: false },
+      { type: '(nillable str)', instruction: :push_var, name: :a },
     ]
   end
 
@@ -394,6 +405,7 @@ describe Compiler do
       { type: '(nillable str)', instruction: :set_var, name: :a, nillable: false },
       { type: 'str', instruction: :push_str, value: 'foo' },
       { type: '(nillable str)', instruction: :set_var, name: :a, nillable: false },
+      { type: '(nillable str)', instruction: :push_var, name: :a },
     ]
   end
 

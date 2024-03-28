@@ -120,6 +120,10 @@ class VM
     push_frame(instructions: body, return_index: @index)
   end
 
+  def execute_pop(_)
+    @stack.pop
+  end
+
   def execute_push_arg(instruction)
     @stack << args.fetch(instruction.index)
   end
@@ -162,7 +166,6 @@ class VM
   end
 
   def execute_set_ivar(instruction)
-    # TODO: Need `used` argument to know whether to leave value on stack or not.
     value = @stack.last
     self_obj.set_ivar(instruction.name, value)
   end

@@ -131,6 +131,10 @@ class Compiler
         @stack << builder.load(result)
       end
 
+      def build_pop(_instruction, _function, _builder)
+        @stack.pop
+      end
+
       def build_push_arg(instruction, _function, _builder)
         function = @scope_stack.last.fetch(:function)
         @stack << function.params[instruction.index]

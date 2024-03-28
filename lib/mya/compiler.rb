@@ -25,30 +25,31 @@ class Compiler
   def compile
     @scope_stack = [{ vars: {} }]
     @instructions = []
-    transform(@ast)
+    transform(@ast, used: true)
     type_check
     @instructions
   end
 
   private
 
-  def transform(node)
-    send("transform_#{node.type}", node)
+  def transform(node, used:)
+    send("transform_#{node.type}", node, used:)
   end
 
-  def transform_array_node(node)
+  def transform_array_node(node, used:)
     node.elements.each do |element|
-      transform(element)
+      transform(element, used:)
     end
     instruction = PushArrayInstruction.new(node.elements.size, line: node.location.start_line)
     @instructions << instruction
+    @instructions << PopInstruction.new unless used
   end
 
-  def transform_call_node(node)
-    transform(node.receiver) if node.receiver
+  def transform_call_node(node, used:)
+    transform(node.receiver, used: true) if node.receiver
     args = (node.arguments&.arguments || [])
     args.each do |arg|
-      transform(arg)
+      transform(arg, used: true)
     end
     instruction = CallInstruction.new(
       node.name,
@@ -57,30 +58,34 @@ class Compiler
       line: node.location.start_line
     )
     @instructions << instruction
+    @instructions << PopInstruction.new unless used
   end
 
-  def transform_class_node(node)
+  def transform_class_node(node, used:)
     name = node.constant_path.name
     body = node.body
     instruction = ClassInstruction.new(name, line: node.location.start_line)
-    @instructions << instruction
     class_instructions = []
+    # FIXME: check if node.body and skip this entirely if nil?
     with_instructions_array(class_instructions) do
-      transform(node.body || Prism::NilNode.new(node.location))
+      transform(node.body || Prism::NilNode.new(node.location), used: false)
     end
     instruction.body = class_instructions
+    @instructions << instruction
+    @instructions << PushStrInstruction.new(instruction.name, line: node.location.start_line) if used
   end
 
-  def transform_constant_read_node(node)
+  def transform_constant_read_node(node, used:)
+    return unless used
+
     instruction = PushConstInstruction.new(node.name, line: node.location.start_line)
     @instructions << instruction
   end
 
-  def transform_def_node(node)
+  def transform_def_node(node, used:)
     @scope_stack << { vars: {} }
     params = (node.parameters&.requireds || [])
     instruction = DefInstruction.new(node.name, line: node.location.start_line)
-    @instructions << instruction
     def_instructions = []
     params.each_with_index do |param, index|
       i1 = PushArgInstruction.new(index, line: node.location.start_line)
@@ -90,82 +95,99 @@ class Compiler
       instruction.params << param.name
     end
     with_instructions_array(def_instructions) do
-      transform(node.body)
+      transform(node.body, used: true)
     end
     instruction.body = def_instructions
     @scope_stack.pop
+    @instructions << instruction
+    @instructions << PushStrInstruction.new(instruction.name, line: node.location.start_line) if used
   end
 
-  def transform_else_node(node)
-    transform(node.statements)
+  def transform_else_node(node, used:)
+    transform(node.statements, used:)
   end
 
-  def transform_false_node(node)
+  def transform_false_node(node, used:)
+    return unless used
+
     instruction = PushFalseInstruction.new(line: node.location.start_line)
     @instructions << instruction
   end
 
-  def transform_if_node(node)
-    transform(node.predicate)
+  def transform_if_node(node, used:)
+    transform(node.predicate, used: true)
     instruction = IfInstruction.new(line: node.location.start_line)
-    @instructions << instruction
     instruction.if_true = []
     with_instructions_array(instruction.if_true) do
-      transform(node.statements)
+      transform(node.statements, used: true)
     end
     instruction.if_false = []
     with_instructions_array(instruction.if_false) do
-      transform(node.consequent)
+      transform(node.consequent, used: true)
     end
+    @instructions << instruction
+    @instructions << PopInstruction.new unless used
   end
 
-  def transform_instance_variable_write_node(node)
-    transform(node.value)
+  def transform_instance_variable_write_node(node, used:)
+    transform(node.value, used: true)
     directives = @directives.dig(node.location.start_line, node.name) || []
     nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
     instruction = SetInstanceVarInstruction.new(node.name, nillable:, line: node.location.start_line)
     @instructions << instruction
+    @instructions << PopInstruction.new unless used
   end
 
-  def transform_integer_node(node)
+  def transform_integer_node(node, used:)
+    return unless used
+
     instruction = PushIntInstruction.new(node.value, line: node.location.start_line)
     @instructions << instruction
   end
 
-  def transform_local_variable_read_node(node)
+  def transform_local_variable_read_node(node, used:)
+    return unless used
+
     instruction = PushVarInstruction.new(node.name, line: node.location.start_line)
     @instructions << instruction
   end
 
-  def transform_local_variable_write_node(node)
-    transform(node.value)
+  def transform_local_variable_write_node(node, used:)
+    transform(node.value, used: true)
     directives = @directives.dig(node.location.start_line, node.name) || []
     nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
     instruction = SetVarInstruction.new(node.name, nillable:, line: node.location.start_line)
     @instructions << instruction
+    @instructions << PushVarInstruction.new(node.name, line: node.location.start_line) if used
   end
 
-  def transform_nil_node(node)
+  def transform_nil_node(node, used:)
+    return unless used
+
     instruction = PushNilInstruction.new(line: node.location.start_line)
     @instructions << instruction
   end
 
-  def transform_program_node(node)
-    transform(node.statements)
+  def transform_program_node(node, used:)
+    transform(node.statements, used:)
   end
 
-  def transform_statements_node(node)
-    node.body.each do |n|
-      transform(n)
+  def transform_statements_node(node, used:)
+    node.body.each_with_index do |n, i|
+      transform(n, used: used && i == node.body.size - 1)
     end
   end
 
-  def transform_string_node(node)
+  def transform_string_node(node, used:)
+    return unless used
+
     instruction = PushStrInstruction.new(node.unescaped, line: node.location.start_line)
     @instructions << instruction
   end
 
-  def transform_true_node(node)
+  def transform_true_node(node, used:)
+    return unless used
+
     instruction = PushTrueInstruction.new(line: node.location.start_line)
     @instructions << instruction
   end
