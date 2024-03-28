@@ -78,77 +78,98 @@ class Compiler
       end
 
       def build(instruction, function, builder)
-        case instruction
-        when PushIntInstruction
-          @stack << LLVM::Int(instruction.value)
-        when PushStrInstruction
-          @stack << build_string(builder, instruction.value)
-        when PushNilInstruction
-          @stack << RcBuilder.pointer_type.null_pointer
-        when PushTrueInstruction
-          @stack << LLVM::TRUE
-        when PushFalseInstruction
-          @stack << LLVM::FALSE
-        when SetVarInstruction
-          value = @stack.pop
-          variable = builder.alloca(value.type, "var_#{instruction.name}")
-          builder.store(value, variable)
-          vars[instruction.name] = variable
-        when PushVarInstruction
-          variable = vars.fetch(instruction.name)
-          @stack << builder.load(variable)
-        when PushArrayInstruction
-          @stack << build_array(builder, instruction)
-        when DefInstruction
-          @index += 1
-          name = instruction.name
-          param_types = (0...instruction.params.size).map do |i|
-            llvm_type(instruction.body.fetch(i * 2).type!)
-          end
-          return_type = llvm_type(instruction.return_type)
-          @methods[name] = fn = @module.functions.add(name, param_types, return_type)
-          build_function(fn, instruction.body)
-        when CallInstruction
-          args = @stack.pop(instruction.arg_count)
-          if instruction.has_receiver?
-            args.unshift @stack.pop
-          end
-          name = instruction.name
-          fn = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
-          if fn.respond_to?(:call)
-            @stack << fn.call(builder:, instruction:, args:)
-          else
-            @stack << builder.call(fn, *args)
-          end
-        when PushArgInstruction
-          function = @scope_stack.last.fetch(:function)
-          @stack << function.params[instruction.index]
-        when IfInstruction
-          result = builder.alloca(llvm_type(instruction.type!), "if_line_#{instruction.line}")
-          then_block = function.basic_blocks.append
-          else_block = function.basic_blocks.append
-          result_block = function.basic_blocks.append
-          condition = @stack.pop
-          builder.cond(condition, then_block, else_block)
-          @index += 1
-          then_block.build do |then_builder|
-            build_instructions(function, then_builder, instruction.if_true) do |value|
-              then_builder.store(value, result)
-              then_builder.br(result_block)
-            end
-          end
-          @index += 1
-          else_block.build do |else_builder|
-            build_instructions(function, else_builder, instruction.if_false) do |value|
-              else_builder.store(value, result)
-              else_builder.br(result_block)
-            end
-          end
-          builder.position_at_end(result_block)
-          @stack << builder.load(result)
-        else
-          raise "Unknown instruction: #{instruction.inspect}"
+        send("build_#{instruction.instruction_name}", instruction, function, builder)
+      end
+
+      def build_call(instruction, _function, builder)
+        args = @stack.pop(instruction.arg_count)
+        if instruction.has_receiver?
+          args.unshift @stack.pop
         end
+        name = instruction.name
+        fn = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
+        if fn.respond_to?(:call)
+          @stack << fn.call(builder:, instruction:, args:)
+        else
+          @stack << builder.call(fn, *args)
+        end
+      end
+
+      def build_def(instruction, _function, _builder)
+        @index += 1
+        name = instruction.name
+        param_types = (0...instruction.params.size).map do |i|
+          llvm_type(instruction.body.fetch(i * 2).type!)
+        end
+        return_type = llvm_type(instruction.return_type)
+        @methods[name] = fn = @module.functions.add(name, param_types, return_type)
+        build_function(fn, instruction.body)
+      end
+
+      def build_if(instruction, function, builder)
+        result = builder.alloca(llvm_type(instruction.type!), "if_line_#{instruction.line}")
+        then_block = function.basic_blocks.append
+        else_block = function.basic_blocks.append
+        result_block = function.basic_blocks.append
+        condition = @stack.pop
+        builder.cond(condition, then_block, else_block)
+        @index += 1
+        then_block.build do |then_builder|
+          build_instructions(function, then_builder, instruction.if_true) do |value|
+            then_builder.store(value, result)
+            then_builder.br(result_block)
+          end
+        end
+        @index += 1
+        else_block.build do |else_builder|
+          build_instructions(function, else_builder, instruction.if_false) do |value|
+            else_builder.store(value, result)
+            else_builder.br(result_block)
+          end
+        end
+        builder.position_at_end(result_block)
+        @stack << builder.load(result)
+      end
+
+      def build_push_arg(instruction, _function, _builder)
+        function = @scope_stack.last.fetch(:function)
+        @stack << function.params[instruction.index]
+      end
+
+      def build_push_array(instruction, _function, builder)
+        @stack << build_array(builder, instruction)
+      end
+
+      def build_push_false(_instruction, _function, _builder)
+        @stack << LLVM::FALSE
+      end
+
+      def build_push_int(instruction, _function, _builder)
+        @stack << LLVM::Int(instruction.value)
+      end
+
+      def build_push_nil(_instruction, _function, _builder)
+        @stack << RcBuilder.pointer_type.null_pointer
+      end
+
+      def build_push_str(instruction, _function, builder)
+        @stack << build_string(builder, instruction.value)
+      end
+
+      def build_push_true(_instruction, _function, _builder)
+        @stack << LLVM::TRUE
+      end
+
+      def build_push_var(instruction, _function, builder)
+        variable = vars.fetch(instruction.name)
+        @stack << builder.load(variable)
+      end
+
+      def build_set_var(instruction, _function, builder)
+        value = @stack.pop
+        variable = builder.alloca(value.type, "var_#{instruction.name}")
+        builder.store(value, variable)
+        vars[instruction.name] = variable
       end
 
       def scope
