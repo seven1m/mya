@@ -66,9 +66,10 @@ class Compiler
     body = node.body
     instruction = ClassInstruction.new(name, line: node.location.start_line)
     class_instructions = []
-    # FIXME: check if node.body and skip this entirely if nil?
-    with_instructions_array(class_instructions) do
-      transform(node.body || Prism::NilNode.new(node.location), used: false)
+    if node.body
+      with_instructions_array(class_instructions) do
+        transform(node.body, used: false)
+      end
     end
     instruction.body = class_instructions
     @instructions << instruction
