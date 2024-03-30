@@ -108,7 +108,7 @@ class Compiler
     def evaluated_type = self
   end
 
-  class FunctionType < TypeOperator
+  class MethodType < TypeOperator
     def initialize(*types)
       super('->', types)
     end
@@ -120,17 +120,17 @@ class Compiler
     end
 
     def inspect
-      "#<FunctionType types=[#{types.map(&:inspect).join(', ')}]>"
+      "#<MethodType types=[#{types.map(&:inspect).join(', ')}]>"
     end
 
     def evaluated_type = types.last
   end
 
   # This just exists for debugging purposes.
-  # We could easily use FunctionType, but would lose some context when puts debugging. :-)
-  class CallType < FunctionType
+  # We could easily use MethodType, but would lose some context when puts debugging. :-)
+  class CallType < MethodType
     def inspect
-      super.sub('FunctionType', 'CallType')
+      super.sub('MethodType', 'CallType')
     end
   end
 
@@ -226,7 +226,7 @@ class Compiler
       analyze_instruction(instruction).prune
       @calls_to_unify.each do |call|
         type_of_receiver = call.fetch(:type_of_receiver).prune
-        retrieve_method_and_analyze_call(**call, type_of_receiver:)
+        unify_call_with_method(**call, type_of_receiver:)
       end
     end
 
@@ -280,25 +280,25 @@ class Compiler
         return type_of_return
       end
 
-      retrieve_method_and_analyze_call(type_of_receiver:, type_of_call:, instruction:)
+      unify_call_with_method(type_of_receiver:, type_of_call:, instruction:)
 
       instruction.type = type_of_call
       @stack << type_of_return
       type_of_return
     end
 
-    def retrieve_method_and_analyze_call(type_of_receiver:, type_of_call:, instruction:)
-      type_of_fun = retrieve_method(type_of_receiver, instruction.name)
-      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver}" unless type_of_fun
+    def unify_call_with_method(type_of_receiver:, type_of_call:, instruction:)
+      type_of_method = retrieve_method(type_of_receiver, instruction.name)
+      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver}" unless type_of_method
 
-      unify_type(type_of_fun, type_of_call, instruction)
+      unify_type(type_of_method, type_of_call, instruction)
     end
 
     def analyze_class(instruction)
       class_type = @classes[instruction.name] = ClassType.new(instruction.name)
       object_type = ObjectType.new(class_type)
       @methods[class_type.name_for_method_lookup] = {
-        new: FunctionType.new(class_type, object_type)
+        new: MethodType.new(class_type, object_type)
       }
 
       @scope_stack << { vars: {}, class_type: }
@@ -323,13 +323,13 @@ class Compiler
       type_of_body = analyze_instruction(instruction.body)
       @scope_stack.pop
 
-      type_of_fun = FunctionType.new(*parameter_types, type_of_body)
-      unify_type(type_of_fun, placeholder_var, instruction)
+      type_of_method = MethodType.new(*parameter_types, type_of_body)
+      unify_type(type_of_method, placeholder_var, instruction)
 
-      @methods[current_object_type&.name_for_method_lookup][instruction.name] = type_of_fun.non_generic!
-      instruction.type = type_of_fun
+      @methods[current_object_type&.name_for_method_lookup][instruction.name] = type_of_method.non_generic!
+      instruction.type = type_of_method
 
-      type_of_fun
+      type_of_method
     end
 
     def analyze_if(instruction)
@@ -596,22 +596,22 @@ class Compiler
       array = AryType.new(array_type)
       {
         nil => {
-          puts: FunctionType.new(UnionType.new(IntType, StrType), IntType),
+          puts: MethodType.new(UnionType.new(IntType, StrType), IntType),
         },
         'int' => {
-          zero?: FunctionType.new(IntType, BoolType),
-          "+": FunctionType.new(IntType, IntType, IntType),
-          "==": FunctionType.new(IntType, IntType, BoolType),
-          "-": FunctionType.new(IntType, IntType, IntType),
-          "*": FunctionType.new(IntType, IntType, IntType),
-          "/": FunctionType.new(IntType, IntType, IntType),
+          zero?: MethodType.new(IntType, BoolType),
+          "+": MethodType.new(IntType, IntType, IntType),
+          "==": MethodType.new(IntType, IntType, BoolType),
+          "-": MethodType.new(IntType, IntType, IntType),
+          "*": MethodType.new(IntType, IntType, IntType),
+          "/": MethodType.new(IntType, IntType, IntType),
         },
         'array' => {
-          nth: FunctionType.new(array, IntType, array_type),
-          first: FunctionType.new(array, array_type),
-          last: FunctionType.new(array, array_type),
-          '<<': FunctionType.new(array, array_type, array),
-          push: FunctionType.new(array, array_type, array_type),
+          nth: MethodType.new(array, IntType, array_type),
+          first: MethodType.new(array, array_type),
+          last: MethodType.new(array, array_type),
+          '<<': MethodType.new(array, array_type, array),
+          push: MethodType.new(array, array_type, array_type),
         },
       }.tap do |hash|
         hash.default_proc = proc { |hash, key| hash[key] = {} }
