@@ -100,8 +100,7 @@ class Compiler
     end
 
     def to_s
-      arg_types = types[0...-1]
-      return_type = types.last
+      *arg_types, return_type = types
       "([#{arg_types.join(', ')}] -> #{return_type})"
     end
 
@@ -158,32 +157,31 @@ class Compiler
 
   class ClassType < TypeOperator
     def initialize(class_name)
-      super('class', [])
-      @class_name = class_name.to_s
+      super(class_name.to_s, [])
       @attributes = {}
     end
 
-    attr_reader :class_name, :attributes
+    def class_name = name
+    attr_reader :attributes
 
     def to_s
       attrs = attributes.map { |name, type| "#{name}:#{type}" }.join(', ')
-      "(class #{@class_name} #{attrs})"
+      "(class #{class_name} #{attrs})"
     end
 
-    def inspect = "#<ClassType class_name=#{@class_name.inspect}>"
+    def inspect = "#<ClassType class_name=#{class_name.inspect} attributes=#{@attributes.inspect}>"
 
-    def name_for_method_lookup = @class_name
+    def name_for_method_lookup = class_name
   end
 
   class ObjectType < TypeOperator
     def initialize(klass)
-      super('object', [])
-      @klass = klass
+      super('object', [klass])
     end
 
-    attr_reader :klass
+    def klass = types.first
 
-    def to_s = "(object #{@klass.class_name})"
+    def to_s = "(object #{klass.class_name})"
 
     def inspect = "#<ObjectType klass=#{klass.inspect}>"
 
@@ -518,8 +516,6 @@ class Compiler
       unify_type(selected, b, instruction)
     end
 
-    # FIXME: this won't work on ObjectType since we don't compare klass.class_name.
-    # Need a test to prove that this breaks for two separate classes.
     def unify_type_operator_with_type_operator(a, b, instruction)
       unless a.name == b.name && a.types.size == b.types.size
         raise_type_clash_error(a, b, instruction)

@@ -55,6 +55,19 @@ describe Compiler do
     ]
   end
 
+  it 'raises an error if two objects cannot unify' do
+    code = <<~CODE
+      class Foo; end
+      class Bar; end
+
+      def same?(a); nil; end
+      same?(Foo.new)
+      same?(Bar.new)
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal '([(object main), (object Foo)] -> nil) cannot unify with ([(object main), (object Bar)] -> a) in call to same? on line 6'
+  end
+
   it 'compiles variables set and get' do
     expect(compile('a = 1; a')).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },
