@@ -287,7 +287,7 @@ class Compiler
           '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
           'puts': -> (builder:, args:, instruction:) do
             arg = args.first
-            arg_type = instruction.type!.types.first.to_sym
+            arg_type = instruction.type!.types[1].to_sym
             case arg_type
             when :int
               builder.call(fn_puts_int, arg)

@@ -161,7 +161,7 @@ describe Compiler do
     CODE
     expect(compile(code)).must_equal_with_diff [
       {
-        type: '([] -> str)',
+        type: '([(object main)] -> str)',
         instruction: :def,
         name: :foo,
         params: [],
@@ -170,7 +170,7 @@ describe Compiler do
         ]
       },
       {
-        type: '([] -> int)',
+        type: '([(object main)] -> int)',
         instruction: :def,
         name: :bar,
         params: [],
@@ -179,7 +179,7 @@ describe Compiler do
         ]
       },
       {
-        type: '([] -> str)',
+        type: '([(object main)] -> str)',
         instruction: :call,
         name: :foo,
         has_receiver: false,
@@ -187,7 +187,7 @@ describe Compiler do
       },
       { type: 'nil', instruction: :pop },
       {
-        type: '([] -> int)',
+        type: '([(object main)] -> int)',
         instruction: :call,
         name: :bar,
         has_receiver: false,
@@ -212,7 +212,7 @@ describe Compiler do
     CODE
     expect(compile(code)).must_equal_with_diff [
       {
-        type: '([int] -> int)',
+        type: '([(object main), int] -> int)',
         instruction: :def,
         name: :bar,
         params: [:a],
@@ -224,7 +224,7 @@ describe Compiler do
       },
 
       {
-        type: '([str, int] -> str)',
+        type: '([(object main), str, int] -> str)',
         instruction: :def,
         name: :foo,
         params: [:a, :b],
@@ -239,11 +239,11 @@ describe Compiler do
 
       { type: 'str', instruction: :push_str, value: 'foo' },
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: '([str, int] -> str)', instruction: :call, name: :foo, has_receiver: false, arg_count: 2 },
+      { type: '([(object main), str, int] -> str)', instruction: :call, name: :foo, has_receiver: false, arg_count: 2 },
       { type: 'nil', instruction: :pop },
 
       { type: 'int', instruction: :push_int, value: 2 },
-      { type: '([int] -> int)', instruction: :call, name: :bar, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), int] -> int)', instruction: :call, name: :bar, has_receiver: false, arg_count: 1 }
     ]
   end
 
@@ -269,7 +269,7 @@ describe Compiler do
       foo('bar')
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal '([int] -> int) cannot unify with ([str] -> a) in call to foo on line 7'
+    expect(e.message).must_equal '([(object main), int] -> int) cannot unify with ([(object main), str] -> a) in call to foo on line 7'
   end
 
   it 'raises an error if the arg count of method and call do not match' do
@@ -281,7 +281,7 @@ describe Compiler do
       foo(1, 2)
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal '([a] -> a) cannot unify with ([int, int] -> b) in call to foo on line 5'
+    expect(e.message).must_equal '([(object main), a] -> a) cannot unify with ([(object main), int, int] -> b) in call to foo on line 5'
   end
 
   it 'compiles operator expressions' do
@@ -339,11 +339,11 @@ describe Compiler do
   it 'compiles calls to puts for both int and str' do
     expect(compile('puts(1)')).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: '([int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
     ]
     expect(compile('puts("foo")')).must_equal_with_diff [
       { type: 'str', instruction: :push_str, value: 'foo' },
-      { type: '([str] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), str] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
     ]
   end
 
@@ -426,7 +426,7 @@ describe Compiler do
     code = File.read(File.expand_path('../examples/fib.rb', __dir__))
     expect(compile(code)).must_equal_with_diff [
       {
-        type: '([int] -> int)',
+        type: '([(object main), int] -> int)',
         instruction: :def,
         name: :fib,
         params: [:n],
@@ -456,11 +456,11 @@ describe Compiler do
                   { type: 'int', instruction: :push_var, name: :n },
                   { type: 'int', instruction: :push_int, value: 1 },
                   { type: '([int, int] -> int)', instruction: :call, name: :-, has_receiver: true, arg_count: 1 },
-                  { type: '([int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
+                  { type: '([(object main), int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
                   { type: 'int', instruction: :push_var, name: :n },
                   { type: 'int', instruction: :push_int, value: 2 },
                   { type: '([int, int] -> int)', instruction: :call, name: :-, has_receiver: true, arg_count: 1 },
-                  { type: '([int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
+                  { type: '([(object main), int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
                   { type: '([int, int] -> int)', instruction: :call, name: :+, has_receiver: true, arg_count: 1 },
                 ]
               },
@@ -470,8 +470,8 @@ describe Compiler do
       },
 
       { type: 'int', instruction: :push_int, value: 10 },
-      { type: '([int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
-      { type: '([int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
+      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
     ]
   end
 
@@ -479,7 +479,7 @@ describe Compiler do
     code = File.read(File.expand_path('../examples/fact.rb', __dir__))
     expect(compile(code)).must_equal_with_diff [
       {
-        type: "([int, int] -> int)",
+        type: "([(object main), int, int] -> int)",
         instruction: :def,
         name: :fact,
         params: [:n, :result],
@@ -508,7 +508,7 @@ describe Compiler do
               { type: 'int', instruction: :push_var, name: :result },
               { type: 'int', instruction: :push_var, name: :n },
               { type: '([int, int] -> int)', instruction: :call, name: :*, has_receiver: true, arg_count: 1 },
-              { type: '([int, int] -> int)', instruction: :call, name: :fact, has_receiver: false, arg_count: 2 }
+              { type: '([(object main), int, int] -> int)', instruction: :call, name: :fact, has_receiver: false, arg_count: 2 }
             ]
           }
         ]
@@ -516,8 +516,8 @@ describe Compiler do
 
       { type: 'int', instruction: :push_int, value: 10 },
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: '([int, int] -> int)', instruction: :call, name: :fact, has_receiver: false, arg_count: 2 },
-      { type: '([int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 },
+      { type: '([(object main), int, int] -> int)', instruction: :call, name: :fact, has_receiver: false, arg_count: 2 },
+      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 },
     ]
   end
 end

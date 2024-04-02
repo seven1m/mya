@@ -1,13 +1,5 @@
 require 'set'
 
-class Hash
-  def deep_dup
-    each_with_object({}) do |(key, val), hash|
-      hash[key] = val.is_a?(Hash) ? val.deep_dup : val
-    end
-  end
-end
-
 class Compiler
   class TypeVariable
     def initialize(type_checker)
@@ -22,17 +14,11 @@ class Compiler
       @name ||= @type_checker.next_variable_name
     end
 
-    def to_s
-      name.to_s
-    end
+    def to_s = name.to_s
 
-    def to_sym
-      name.to_sym
-    end
+    def to_sym = name.to_sym
 
-    def inspect
-      "TypeVariable(id = #{id})"
-    end
+    def inspect = "TypeVariable(id = #{id})"
 
     def generic? = @generic
 
@@ -184,6 +170,8 @@ class Compiler
       "(class #{@class_name} #{attrs})"
     end
 
+    def inspect = "#<ClassType class_name=#{@class_name.inspect}>"
+
     def name_for_method_lookup = @class_name
   end
 
@@ -195,9 +183,9 @@ class Compiler
 
     attr_reader :klass
 
-    def to_s
-      "(object #{@klass.class_name})"
-    end
+    def to_s = "(object #{@klass.class_name})"
+
+    def inspect = "#<ObjectType klass=#{klass.inspect}>"
 
     def name_for_method_lookup = to_s
   end
@@ -214,9 +202,12 @@ class Compiler
     class UndefinedMethod < Error; end
     class UndefinedVariable < Error; end
 
+    MainClass = ClassType.new('main')
+    MainObject = ObjectType.new(MainClass)
+
     def initialize
       @stack = []
-      @scope_stack = [{ vars: {}, class_type: nil }]
+      @scope_stack = [{ vars: {}, self_type: MainClass }]
       @classes = {}
       @calls_to_unify = []
       @methods = build_initial_methods
@@ -226,7 +217,7 @@ class Compiler
       analyze_instruction(instruction).prune
       @calls_to_unify.each do |call|
         type_of_receiver = call.fetch(:type_of_receiver).prune
-        unify_call_with_method(**call, type_of_receiver:)
+        analyze_call_with_known_receiver(**call, type_of_receiver:)
       end
     end
 
@@ -265,11 +256,12 @@ class Compiler
 
       if instruction.has_receiver?
         type_of_receiver = pop&.prune or raise('expected receiver on stack but got nil')
-        type_of_args.unshift(type_of_receiver)
+      else
+        type_of_receiver = current_object_type
       end
 
       type_of_return = TypeVariable.new(self)
-      type_of_call = CallType.new(*type_of_args, type_of_return)
+      type_of_call = CallType.new(type_of_receiver, *type_of_args, type_of_return)
 
       if type_of_receiver.is_a?(TypeVariable)
         # We cannot unify yet, since we don't know the receiver type.
@@ -280,16 +272,16 @@ class Compiler
         return type_of_return
       end
 
-      unify_call_with_method(type_of_receiver:, type_of_call:, instruction:)
+      analyze_call_with_known_receiver(type_of_receiver:, type_of_call:, instruction:)
 
       instruction.type = type_of_call
       @stack << type_of_return
       type_of_return
     end
 
-    def unify_call_with_method(type_of_receiver:, type_of_call:, instruction:)
+    def analyze_call_with_known_receiver(type_of_receiver:, type_of_call:, instruction:)
       type_of_method = retrieve_method(type_of_receiver, instruction.name)
-      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver}" unless type_of_method
+      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver.inspect}" unless type_of_method
 
       unify_type(type_of_method, type_of_call, instruction)
     end
@@ -301,7 +293,7 @@ class Compiler
         new: MethodType.new(class_type, object_type)
       }
 
-      @scope_stack << { vars: {}, class_type: }
+      @scope_stack << { vars: {}, self_type: class_type }
       analyze_instruction(instruction.body)
       @scope_stack.pop
 
@@ -317,13 +309,12 @@ class Compiler
       parameter_types = instruction.params.map do |param|
         new_vars[param] = TypeVariable.new(self).non_generic!
       end
-      parameter_types.unshift(current_object_type) if current_object_type
 
       @scope_stack << scope.merge(parameter_types:, vars: new_vars)
       type_of_body = analyze_instruction(instruction.body)
       @scope_stack.pop
 
-      type_of_method = MethodType.new(*parameter_types, type_of_body)
+      type_of_method = MethodType.new(current_object_type, *parameter_types, type_of_body)
       unify_type(type_of_method, placeholder_var, instruction)
 
       @methods[current_object_type&.name_for_method_lookup][instruction.name] = type_of_method.non_generic!
@@ -527,6 +518,8 @@ class Compiler
       unify_type(selected, b, instruction)
     end
 
+    # FIXME: this won't work on ObjectType since we don't compare klass.class_name.
+    # Need a test to prove that this breaks for two separate classes.
     def unify_type_operator_with_type_operator(a, b, instruction)
       unless a.name == b.name && a.types.size == b.types.size
         raise_type_clash_error(a, b, instruction)
@@ -584,7 +577,7 @@ class Compiler
     end
 
     def current_class_type
-      scope.fetch(:class_type)
+      scope.fetch(:self_type)
     end
 
     def current_object_type
@@ -595,8 +588,8 @@ class Compiler
       array_type = TypeVariable.new(self)
       array = AryType.new(array_type)
       {
-        nil => {
-          puts: MethodType.new(UnionType.new(IntType, StrType), IntType),
+        '(object main)' => {
+          puts: MethodType.new(MainObject, UnionType.new(IntType, StrType), IntType),
         },
         'int' => {
           zero?: MethodType.new(IntType, BoolType),
