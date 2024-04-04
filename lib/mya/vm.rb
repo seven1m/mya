@@ -88,18 +88,16 @@ class VM
   def execute_call(instruction)
     new_args = @stack.pop(instruction.arg_count)
 
-    if instruction.has_receiver?
-      receiver = @stack.pop or raise(ArgumentError, 'No receiver')
-      name = instruction.name
-      if receiver.respond_to?(name)
-        @stack << receiver.send(name, *new_args)
-        return
-      end
-      if receiver.methods.key?(name)
-        push_frame(instructions: receiver.methods[name], return_index: @index, with_scope: true)
-        @scope_stack << { args: new_args, vars: {}, self_obj: receiver }
-        return
-      end
+    receiver = @stack.pop or raise(ArgumentError, 'No receiver')
+    name = instruction.name
+    if receiver.respond_to?(name)
+      @stack << receiver.send(name, *new_args)
+      return
+    end
+    if receiver.methods.key?(name)
+      push_frame(instructions: receiver.methods[name], return_index: @index, with_scope: true)
+      @scope_stack << { args: new_args, vars: {}, self_obj: receiver }
+      return
     end
 
     if (built_in_method = BUILT_IN_METHODS[instruction.name])
@@ -151,6 +149,10 @@ class VM
 
   def execute_push_str(instruction)
     @stack << instruction.value
+  end
+
+  def execute_push_self(instruction)
+    @stack << self_obj
   end
 
   def execute_push_true(_)

@@ -5,6 +5,8 @@ class Compiler
         def initialize(builder:, mod:, string: nil, ptr: nil)
           super(builder:, mod:, ptr:)
 
+          string = string.to_s
+
           unless ptr
             str = LLVM::ConstantArray.string(string)
             str_ptr = @builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
@@ -20,12 +22,6 @@ class Compiler
 
           @fn_rc_set_str = @module.functions['rc_set_str'] ||
             @module.functions.add('rc_set_str', [pointer_type, LLVM::Type.pointer(LLVM::UInt8), LLVM::UInt32], LLVM::Type.void)
-        end
-
-        private
-
-        def load_str_ptr
-          load_ptr(LLVM::Type.pointer(LLVM::UInt8))
         end
       end
     end

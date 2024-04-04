@@ -46,14 +46,17 @@ class Compiler
   end
 
   def transform_call_node(node, used:)
-    transform(node.receiver, used: true) if node.receiver
+    if node.receiver
+      transform(node.receiver, used: true)
+    else
+      @instructions << PushSelfInstruction.new
+    end
     args = (node.arguments&.arguments || [])
     args.each do |arg|
       transform(arg, used: true)
     end
     instruction = CallInstruction.new(
       node.name,
-      has_receiver: !!node.receiver,
       arg_count: args.size,
       line: node.location.start_line
     )

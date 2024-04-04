@@ -4,10 +4,24 @@
 #include <string.h>
 
 typedef struct {
+    const char *class_name;
+} Class;
+
+typedef struct {
+    Class *klass;
+} Object;
+
+typedef struct {
     void *ptr;
     size_t size;
     size_t ref_count;
 } RC;
+
+Object *object_new(Class *klass) {
+    Object *obj = malloc(sizeof(Object));
+    obj->klass = klass;
+    return obj;
+}
 
 void rc_set_str(RC *rc, char *str, size_t size) {
     rc->ptr = malloc(sizeof(char) * (size + 1));

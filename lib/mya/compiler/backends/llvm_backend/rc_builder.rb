@@ -8,10 +8,10 @@ class Compiler
           if ptr
             @ptr = ptr
           else
-            @ptr = builder.malloc(type, 'rc')
+            @ptr = builder.malloc(type, self.class.simple_name)
             store_ptr(LLVM::Type.ptr.null_pointer)
-            store_ref_count(1)
           end
+          store_ref_count(1)
         end
 
         def to_ptr = @ptr
@@ -49,6 +49,10 @@ class Compiler
 
         def self.pointer_type
           @pointer_type ||= LLVM::Type.pointer(type)
+        end
+
+        def self.simple_name
+          name.split('::').last.sub(/Builder$/, '').downcase
         end
 
         private

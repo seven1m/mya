@@ -43,9 +43,7 @@ class Compiler
 
     attr_reader :value
 
-    def instruction_name
-      :push_int
-    end
+    def instruction_name = :push_int
 
     def to_h
       super.merge(value:)
@@ -60,9 +58,7 @@ class Compiler
 
     attr_reader :value
 
-    def instruction_name
-      :push_str
-    end
+    def instruction_name = :push_str
 
     def to_h
       super.merge(value:)
@@ -70,21 +66,15 @@ class Compiler
   end
 
   class PushTrueInstruction < Instruction
-    def instruction_name
-      :push_true
-    end
+    def instruction_name = :push_true
   end
 
   class PushFalseInstruction < Instruction
-    def instruction_name
-      :push_false
-    end
+    def instruction_name = :push_false
   end
 
   class PushNilInstruction < Instruction
-    def instruction_name
-      :push_nil
-    end
+    def instruction_name = :push_nil
   end
 
   class PushArrayInstruction < Instruction
@@ -95,9 +85,7 @@ class Compiler
 
     attr_reader :size
 
-    def instruction_name
-      :push_array
-    end
+    def instruction_name = :push_array
 
     def to_h
       super.merge(size:)
@@ -112,9 +100,7 @@ class Compiler
 
     attr_reader :name
 
-    def instruction_name
-      :push_var
-    end
+    def instruction_name = :push_var
 
     def to_h
       super.merge(name:)
@@ -132,9 +118,7 @@ class Compiler
 
     def nillable? = @nillable
 
-    def instruction_name
-      :set_var
-    end
+    def instruction_name = :set_var
 
     def to_h
       super.merge(name:, nillable: nillable?)
@@ -152,9 +136,7 @@ class Compiler
 
     def nillable? = @nillable
 
-    def instruction_name
-      :set_ivar
-    end
+    def instruction_name = :set_ivar
 
     def to_h
       super.merge(name:, nillable: nillable?)
@@ -169,9 +151,7 @@ class Compiler
 
     attr_reader :index
 
-    def instruction_name
-      :push_arg
-    end
+    def instruction_name = :push_arg
 
     def to_h
       super.merge(index:)
@@ -186,9 +166,7 @@ class Compiler
 
     attr_reader :name
 
-    def instruction_name
-      :push_const
-    end
+    def instruction_name = :push_const
 
     def to_h
       super.merge(name:)
@@ -196,32 +174,25 @@ class Compiler
   end
 
   class CallInstruction < Instruction
-    def initialize(name, has_receiver:, arg_count:, line:)
+    def initialize(name, arg_count:, line:)
       super(line:)
       @name = name
-      @has_receiver = has_receiver
       @arg_count = arg_count
     end
 
-    attr_reader :name, :has_receiver, :arg_count
+    attr_reader :name, :arg_count
 
-    def instruction_name
-      :call
-    end
-
-    def has_receiver? = @has_receiver
+    def instruction_name = :call
 
     def to_h
-      super.merge(name:, has_receiver:, arg_count:)
+      super.merge(name:, arg_count:)
     end
   end
 
   class IfInstruction < Instruction
     attr_accessor :if_true, :if_false
 
-    def instruction_name
-      :if
-    end
+    def instruction_name = :if
 
     def to_h
       super.merge(
@@ -241,13 +212,10 @@ class Compiler
     attr_reader :name
     attr_accessor :body, :params
 
-    def instruction_name
-      :def
-    end
+    def instruction_name = :def
 
-    def return_type
-      (@pruned_type || @type.prune).types.last
-    end
+    def receiver_type = type!.types.first
+    def return_type = type!.types.last
 
     def to_h
       super.merge(
@@ -267,9 +235,7 @@ class Compiler
     attr_reader :name
     attr_accessor :body
 
-    def instruction_name
-      :class
-    end
+    def instruction_name = :class
 
     def to_h
       super.merge(
@@ -280,8 +246,10 @@ class Compiler
   end
 
   class PopInstruction < Instruction
-    def instruction_name
-      :pop
-    end
+    def instruction_name = :pop
+  end
+
+  class PushSelfInstruction < Instruction
+    def instruction_name = :push_self
   end
 end

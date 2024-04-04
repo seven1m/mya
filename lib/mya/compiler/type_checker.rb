@@ -251,13 +251,7 @@ class Compiler
 
     def analyze_call(instruction)
       type_of_args = pop(instruction.arg_count)
-
-      if instruction.has_receiver?
-        type_of_receiver = pop&.prune or raise('expected receiver on stack but got nil')
-      else
-        type_of_receiver = current_object_type
-      end
-
+      type_of_receiver = pop&.prune
       type_of_return = TypeVariable.new(self)
       type_of_call = CallType.new(type_of_receiver, *type_of_args, type_of_return)
 
@@ -379,6 +373,11 @@ class Compiler
     def analyze_push_nil(instruction)
       @stack << NilType
       instruction.type = NilType
+    end
+
+    def analyze_push_self(instruction)
+      @stack << current_object_type
+      instruction.type = current_object_type
     end
 
     def analyze_push_str(instruction)
@@ -571,6 +570,8 @@ class Compiler
     def vars
       scope.fetch(:vars)
     end
+
+    # FIXME: rename and rearrange these!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     def current_class_type
       scope.fetch(:self_type)

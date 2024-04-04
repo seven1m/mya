@@ -4,6 +4,7 @@ require 'llvm/linker'
 require 'llvm/linker'
 require_relative 'llvm_backend/rc_builder'
 require_relative 'llvm_backend/array_builder'
+require_relative 'llvm_backend/object_builder'
 require_relative 'llvm_backend/string_builder'
 
 class Compiler
@@ -59,13 +60,16 @@ class Compiler
       end
 
       def build_function(function, instructions)
-        @scope_stack << { function:, vars: {} }
         function.basic_blocks.append.build do |builder|
+          @main_obj = ObjectBuilder.new(builder:, mod: @module).to_ptr
+          @scope_stack << { function:, vars: {}, self_obj: @main_obj }
+          #main_obj_ptr = builder.alloca(ObjectBuilder.pointer_type, 'main_obj')
+          #builder.store(@main_obj, main_obj_ptr)
           build_instructions(function, builder, instructions) do |return_value|
             builder.ret return_value
           end
+          @scope_stack.pop
         end
-        @scope_stack.pop
       end
 
       def build_instructions(function, builder, instructions)
@@ -83,11 +87,11 @@ class Compiler
 
       def build_call(instruction, _function, builder)
         args = @stack.pop(instruction.arg_count)
-        if instruction.has_receiver?
-          args.unshift @stack.pop
-        end
+        receiver = @stack.pop
+        receiver_type = instruction.type!.types.first
+        args.unshift(receiver)
         name = instruction.name
-        fn = @methods[name] or raise(NoMethodError, "Method '#{name}' not found")
+        fn = @methods.dig(receiver_type.name_for_method_lookup, name) or raise(NoMethodError, "Method '#{name}' not found")
         if fn.respond_to?(:call)
           @stack << fn.call(builder:, instruction:, args:)
         else
@@ -101,8 +105,11 @@ class Compiler
         param_types = (0...instruction.params.size).map do |i|
           llvm_type(instruction.body.fetch(i * 2).type!)
         end
+        receiver_type = instruction.receiver_type
+        param_types.unshift(llvm_type(receiver_type))
         return_type = llvm_type(instruction.return_type)
-        @methods[name] = fn = @module.functions.add(name, param_types, return_type)
+        @methods[receiver_type.name_for_method_lookup] ||= {}
+        @methods[receiver_type.name_for_method_lookup][name] = fn = @module.functions.add(name, param_types, return_type)
         build_function(fn, instruction.body)
       end
 
@@ -137,7 +144,7 @@ class Compiler
 
       def build_push_arg(instruction, _function, _builder)
         function = @scope_stack.last.fetch(:function)
-        @stack << function.params[instruction.index]
+        @stack << function.params[instruction.index + 1] # receiver is always 0
       end
 
       def build_push_array(instruction, _function, builder)
@@ -154,6 +161,10 @@ class Compiler
 
       def build_push_nil(_instruction, _function, _builder)
         @stack << RcBuilder.pointer_type.null_pointer
+      end
+
+      def build_push_self(instruction, _function, builder)
+        @stack << self_obj
       end
 
       def build_push_str(instruction, _function, builder)
@@ -182,6 +193,10 @@ class Compiler
 
       def vars
         scope.fetch(:vars)
+      end
+
+      def self_obj
+        scope.fetch(:self_obj)
       end
 
       def llvm_type(type)
@@ -265,38 +280,44 @@ class Compiler
 
       def build_methods
         {
-          first: -> (builder:, instruction:, args:) do
-            element_type = llvm_type(instruction.type!)
-            array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
-            array.first
-          end,
-          last: -> (builder:, instruction:, args:) do
-            element_type = llvm_type(instruction.type!)
-            array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
-            array.last
-          end,
-          '<<': -> (builder:, instruction:, args:) do
-            element_type = args.last.type
-            array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
-            array.push(args.last)
-          end,
-          '+': -> (builder:, args:, **) { builder.add(*args) },
-          '-': -> (builder:, args:, **) { builder.sub(*args) },
-          '*': -> (builder:, args:, **) { builder.mul(*args) },
-          '/': -> (builder:, args:, **) { builder.sdiv(*args) },
-          '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
-          'puts': -> (builder:, args:, instruction:) do
-            arg = args.first
-            arg_type = instruction.type!.types[1].to_sym
-            case arg_type
-            when :int
-              builder.call(fn_puts_int, arg)
-            when :str
-              builder.call(fn_puts_str, arg)
-            else
-              raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
+          'array' => {
+            first: -> (builder:, instruction:, args:) do
+              element_type = llvm_type(instruction.type!)
+              array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
+              array.first
+            end,
+            last: -> (builder:, instruction:, args:) do
+              element_type = llvm_type(instruction.type!)
+              array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
+              array.last
+            end,
+            '<<': -> (builder:, instruction:, args:) do
+              element_type = args.last.type
+              array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
+              array.push(args.last)
+            end,
+          },
+          'int' => {
+            '+': -> (builder:, args:, **) { builder.add(*args) },
+            '-': -> (builder:, args:, **) { builder.sub(*args) },
+            '*': -> (builder:, args:, **) { builder.mul(*args) },
+            '/': -> (builder:, args:, **) { builder.sdiv(*args) },
+            '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
+          },
+          '(object main)' => {
+            'puts': -> (builder:, args:, instruction:) do
+              arg = args[1] # receiver is arg 0
+              arg_type = instruction.type!.types[1].to_sym
+              case arg_type
+              when :int
+                builder.call(fn_puts_int, arg)
+              when :str
+                builder.call(fn_puts_str, arg)
+              else
+                raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
+              end
             end
-          end
+          }
         }
       end
 

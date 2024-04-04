@@ -50,8 +50,8 @@ describe Compiler do
         ]
       },
       { type: '(class Foo @bar:int)', instruction: :push_const, name: :Foo },
-      { type: '([(class Foo @bar:int)] -> (object Foo))', instruction: :call, name: :new, has_receiver: true, arg_count: 0 },
-      { type: '([(object Foo)] -> int)', instruction: :call, name: :bar, has_receiver: true, arg_count: 0 }
+      { type: '([(class Foo @bar:int)] -> (object Foo))', instruction: :call, name: :new, arg_count: 0 },
+      { type: '([(object Foo)] -> int)', instruction: :call, name: :bar, arg_count: 0 }
     ]
   end
 
@@ -112,17 +112,17 @@ describe Compiler do
       { type: '(int array)', instruction: :push_array, size: 3 },
       { type: '(int array)', instruction: :set_var, name: :a, nillable: false },
       { type: '(int array)', instruction: :push_var, name: :a },
-      { type: '([(int array)] -> int)', instruction: :call, name: :first, has_receiver: true, arg_count: 0 },
+      { type: '([(int array)] -> int)', instruction: :call, name: :first, arg_count: 0 },
       { type: 'nil', instruction: :pop },
       { type: '(str array)', instruction: :push_array, size: 0 },
       { type: '(str array)', instruction: :set_var, name: :b, nillable: false },
       { type: '(str array)', instruction: :push_var, name: :b },
       { type: 'str', instruction: :push_str, value: "foo" },
-      { type: '([(str array), str] -> (str array))', instruction: :call, name: :<<, has_receiver: true, arg_count: 1, },
+      { type: '([(str array), str] -> (str array))', instruction: :call, name: :<<, arg_count: 1, },
       { type: 'nil', instruction: :pop },
       { type: '(str array)', instruction: :push_var, name: :b },
       { type: 'str', instruction: :push_str, value: "bar" },
-      { type: '([(str array), str] -> (str array))', instruction: :call, name: :<<, has_receiver: true, arg_count: 1, },
+      { type: '([(str array), str] -> (str array))', instruction: :call, name: :<<, arg_count: 1, },
       { type: 'nil', instruction: :pop },
       { type: 'int', instruction: :push_int, value: 4 },
       { type: 'int', instruction: :push_int, value: 5 },
@@ -191,19 +191,19 @@ describe Compiler do
           { type: 'int', instruction: :push_int, value: 1 },
         ]
       },
+      { type: '(object main)', instruction: :push_self },
       {
         type: '([(object main)] -> str)',
         instruction: :call,
         name: :foo,
-        has_receiver: false,
         arg_count: 0,
       },
       { type: 'nil', instruction: :pop },
+      { type: '(object main)', instruction: :push_self },
       {
         type: '([(object main)] -> int)',
         instruction: :call,
         name: :bar,
-        has_receiver: false,
         arg_count: 0,
       }
     ]
@@ -250,13 +250,15 @@ describe Compiler do
         ]
       },
 
+      { type: '(object main)', instruction: :push_self },
       { type: 'str', instruction: :push_str, value: 'foo' },
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: '([(object main), str, int] -> str)', instruction: :call, name: :foo, has_receiver: false, arg_count: 2 },
+      { type: '([(object main), str, int] -> str)', instruction: :call, name: :foo, arg_count: 2 },
       { type: 'nil', instruction: :pop },
 
+      { type: '(object main)', instruction: :push_self },
       { type: 'int', instruction: :push_int, value: 2 },
-      { type: '([(object main), int] -> int)', instruction: :call, name: :bar, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), int] -> int)', instruction: :call, name: :bar, arg_count: 1 }
     ]
   end
 
@@ -305,12 +307,12 @@ describe Compiler do
     expect(compile(code)).must_equal_with_diff [
       { type: 'int', instruction: :push_int, value: 1 },
       { type: 'int', instruction: :push_int, value: 2 },
-      { type: '([int, int] -> int)', instruction: :call, name: :+, has_receiver: true, arg_count: 1 },
+      { type: '([int, int] -> int)', instruction: :call, name: :+, arg_count: 1 },
       { type: 'nil', instruction: :pop },
 
       { type: 'int', instruction: :push_int, value: 3 },
       { type: 'int', instruction: :push_int, value: 4 },
-      { type: '([int, int] -> bool)', instruction: :call, name: :==, has_receiver: true, arg_count: 1 }
+      { type: '([int, int] -> bool)', instruction: :call, name: :==, arg_count: 1 }
     ]
   end
 
@@ -351,12 +353,14 @@ describe Compiler do
 
   it 'compiles calls to puts for both int and str' do
     expect(compile('puts(1)')).must_equal_with_diff [
+      { type: '(object main)', instruction: :push_self },
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, arg_count: 1 }
     ]
     expect(compile('puts("foo")')).must_equal_with_diff [
+      { type: '(object main)', instruction: :push_self },
       { type: 'str', instruction: :push_str, value: 'foo' },
-      { type: '([(object main), str] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), str] -> int)', instruction: :call, name: :puts, arg_count: 1 }
     ]
   end
 
@@ -448,7 +452,7 @@ describe Compiler do
           { type: 'int', instruction: :set_var, name: :n, nillable: false },
           { type: 'int', instruction: :push_var, name: :n },
           { type: 'int', instruction: :push_int, value: 0 },
-          { type: '([int, int] -> bool)', instruction: :call, name: :==, has_receiver: true, arg_count: 1 },
+          { type: '([int, int] -> bool)', instruction: :call, name: :==, arg_count: 1 },
           {
             type: 'int',
             instruction: :if,
@@ -458,7 +462,7 @@ describe Compiler do
             if_false: [
               { type: 'int', instruction: :push_var, name: :n },
               { type: 'int', instruction: :push_int, value: 1 },
-              { type: '([int, int] -> bool)', instruction: :call, name: :==, has_receiver: true, arg_count: 1 },
+              { type: '([int, int] -> bool)', instruction: :call, name: :==, arg_count: 1 },
               {
                 type: 'int',
                 instruction: :if,
@@ -466,15 +470,17 @@ describe Compiler do
                   { type: 'int', instruction: :push_int, value: 1 },
                 ],
                 if_false: [
+                  { type: '(object main)', instruction: :push_self },
                   { type: 'int', instruction: :push_var, name: :n },
                   { type: 'int', instruction: :push_int, value: 1 },
-                  { type: '([int, int] -> int)', instruction: :call, name: :-, has_receiver: true, arg_count: 1 },
-                  { type: '([(object main), int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
+                  { type: '([int, int] -> int)', instruction: :call, name: :-, arg_count: 1 },
+                  { type: '([(object main), int] -> int)', instruction: :call, name: :fib, arg_count: 1 },
+                  { type: '(object main)', instruction: :push_self },
                   { type: 'int', instruction: :push_var, name: :n },
                   { type: 'int', instruction: :push_int, value: 2 },
-                  { type: '([int, int] -> int)', instruction: :call, name: :-, has_receiver: true, arg_count: 1 },
-                  { type: '([(object main), int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
-                  { type: '([int, int] -> int)', instruction: :call, name: :+, has_receiver: true, arg_count: 1 },
+                  { type: '([int, int] -> int)', instruction: :call, name: :-, arg_count: 1 },
+                  { type: '([(object main), int] -> int)', instruction: :call, name: :fib, arg_count: 1 },
+                  { type: '([int, int] -> int)', instruction: :call, name: :+, arg_count: 1 },
                 ]
               },
             ]
@@ -482,9 +488,11 @@ describe Compiler do
         ]
       },
 
+      { type: '(object main)', instruction: :push_self },
+      { type: '(object main)', instruction: :push_self },
       { type: 'int', instruction: :push_int, value: 10 },
-      { type: '([(object main), int] -> int)', instruction: :call, name: :fib, has_receiver: false, arg_count: 1 },
-      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 }
+      { type: '([(object main), int] -> int)', instruction: :call, name: :fib, arg_count: 1 },
+      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, arg_count: 1 }
     ]
   end
 
@@ -503,7 +511,7 @@ describe Compiler do
           { type: 'int', instruction: :set_var, name: :result, nillable: false },
           { type: 'int', instruction: :push_var, name: :n },
           { type: 'int', instruction: :push_int, value: 0 },
-          { type: '([int, int] -> bool)', instruction: :call, name: :==, has_receiver: true, arg_count: 1 },
+          { type: '([int, int] -> bool)', instruction: :call, name: :==, arg_count: 1 },
           {
             type: 'int',
             instruction: :if,
@@ -515,22 +523,25 @@ describe Compiler do
               }
             ],
             if_false: [
+              { type: '(object main)', instruction: :push_self },
               { type: 'int', instruction: :push_var, name: :n },
               { type: 'int', instruction: :push_int, value: 1 },
-              { type: '([int, int] -> int)', instruction: :call, name: :-, has_receiver: true, arg_count: 1 },
+              { type: '([int, int] -> int)', instruction: :call, name: :-, arg_count: 1 },
               { type: 'int', instruction: :push_var, name: :result },
               { type: 'int', instruction: :push_var, name: :n },
-              { type: '([int, int] -> int)', instruction: :call, name: :*, has_receiver: true, arg_count: 1 },
-              { type: '([(object main), int, int] -> int)', instruction: :call, name: :fact, has_receiver: false, arg_count: 2 }
+              { type: '([int, int] -> int)', instruction: :call, name: :*, arg_count: 1 },
+              { type: '([(object main), int, int] -> int)', instruction: :call, name: :fact, arg_count: 2 }
             ]
           }
         ]
       },
 
+      { type: '(object main)', instruction: :push_self },
+      { type: '(object main)', instruction: :push_self },
       { type: 'int', instruction: :push_int, value: 10 },
       { type: 'int', instruction: :push_int, value: 1 },
-      { type: '([(object main), int, int] -> int)', instruction: :call, name: :fact, has_receiver: false, arg_count: 2 },
-      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, has_receiver: false, arg_count: 1 },
+      { type: '([(object main), int, int] -> int)', instruction: :call, name: :fact, arg_count: 2 },
+      { type: '([(object main), int] -> int)', instruction: :call, name: :puts, arg_count: 1 },
     ]
   end
 end
