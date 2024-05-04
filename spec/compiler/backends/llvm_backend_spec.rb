@@ -227,9 +227,17 @@ describe Compiler::Backends::LLVMBackend do
     temp.close
     instructions = Compiler.new(code).compile
     Compiler::Backends::LLVMBackend.new(instructions).dump_ir_to_file(temp.path)
-    `lli #{temp.path} 2>&1`
+    `#{lli} #{temp.path} 2>&1`
   ensure
     File.unlink(temp.path)
+  end
+
+  def lli
+    @lli = if `command -v lli-17 2>/dev/null >/dev/null`
+             'lli-17'
+           else
+             'lli'
+           end
   end
 
   it 'evaluates puts for both int and str' do
