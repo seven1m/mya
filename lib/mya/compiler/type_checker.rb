@@ -169,7 +169,7 @@ class Compiler
       "(class #{class_name} #{attrs})"
     end
 
-    def inspect = "#<ClassType class_name=#{class_name.inspect} attributes=#{@attributes.inspect}>"
+    def inspect = "#<ClassType class_name=#{class_name.inspect} attributes=#{attributes.inspect}>"
 
     def name_for_method_lookup = class_name
   end

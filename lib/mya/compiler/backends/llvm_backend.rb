@@ -52,7 +52,6 @@ class Compiler
         @module = LLVM::Module.new('llvm')
         @return_type = @instructions.last.type!
         @entry = @module.functions.add('main', [], llvm_type(@return_type))
-        @index = 0
         build_function(@entry, @instructions)
         @lib.link_into(@module)
         #@module.dump if @dump || !@module.valid?
@@ -63,8 +62,6 @@ class Compiler
         function.basic_blocks.append.build do |builder|
           @main_obj = ObjectBuilder.new(builder:, mod: @module).to_ptr
           @scope_stack << { function:, vars: {}, self_obj: @main_obj }
-          #main_obj_ptr = builder.alloca(ObjectBuilder.pointer_type, 'main_obj')
-          #builder.store(@main_obj, main_obj_ptr)
           build_instructions(function, builder, instructions) do |return_value|
             builder.ret return_value
           end
@@ -78,7 +75,7 @@ class Compiler
           build(instruction, function, builder)
         end
         return_value = @stack.pop
-        yield return_value
+        yield return_value if block_given?
       end
 
       def build(instruction, function, builder)
@@ -100,7 +97,6 @@ class Compiler
       end
 
       def build_def(instruction, _function, _builder)
-        @index += 1
         name = instruction.name
         param_types = (0...instruction.params.size).map do |i|
           llvm_type(instruction.body.fetch(i * 2).type!)
@@ -120,14 +116,12 @@ class Compiler
         result_block = function.basic_blocks.append
         condition = @stack.pop
         builder.cond(condition, then_block, else_block)
-        @index += 1
         then_block.build do |then_builder|
           build_instructions(function, then_builder, instruction.if_true) do |value|
             then_builder.store(value, result)
             then_builder.br(result_block)
           end
         end
-        @index += 1
         else_block.build do |else_builder|
           build_instructions(function, else_builder, instruction.if_false) do |value|
             else_builder.store(value, result)
