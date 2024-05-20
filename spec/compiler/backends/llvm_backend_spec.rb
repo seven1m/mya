@@ -24,6 +24,18 @@ describe Compiler::Backends::LLVMBackend do
     expect(execute('false')).must_equal(false)
   end
 
+  it 'evaluates classes' do
+    code = <<~CODE
+      class Foo
+        def bar
+          @bar = 10
+        end
+      end
+      Foo.new.bar
+    CODE
+    expect(execute(code)).must_equal(10)
+  end
+
   it 'evaluates variables set and get' do
     expect(execute('a = 1; a + a')).must_equal(2)
   end

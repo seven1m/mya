@@ -19,6 +19,7 @@ class Compiler
         @call_stack = []
         @if_depth = 0
         @methods = build_methods
+        @classes = {}
         @dump = dump
         @lib = LLVM::Module.parse_ir(LIB_PATH)
       end
@@ -98,6 +99,17 @@ class Compiler
         end
       end
 
+      def build_class(instruction, function, builder)
+        name = instruction.name
+        attr_types = instruction.type!.attributes.values.map { |t| llvm_type(t) }
+        klass = @classes[name] = LLVM::Struct(*attr_types, name.to_s)
+        # FIXME: to_s change to symbol plz
+        @methods[name.to_s] = { new: method(:build_call_new) }
+        @scope_stack << { function:, vars: {}, self_obj: klass }
+        build_instructions(function, builder, instruction.body)
+        @scope_stack.pop
+      end
+
       def build_def(instruction, _function, _builder)
         name = instruction.name
         param_types = (0...instruction.params.size).map do |i|
@@ -147,6 +159,10 @@ class Compiler
         @stack << build_array(builder, instruction)
       end
 
+      def build_push_const(instruction, _function, _builder)
+        @stack << @classes.fetch(instruction.name)
+      end
+
       def build_push_false(_instruction, _function, _builder)
         @stack << LLVM::FALSE
       end
@@ -174,6 +190,12 @@ class Compiler
       def build_push_var(instruction, _function, builder)
         variable = vars.fetch(instruction.name)
         @stack << builder.load(variable)
+      end
+
+      def build_set_ivar(instruction, _function, builder)
+        value = @stack.last
+        #self_obj.set_ivar(instruction.name, value)
+
       end
 
       def build_set_var(instruction, _function, builder)
@@ -315,6 +337,11 @@ class Compiler
             end
           }
         }
+      end
+
+      def build_call_new(builder:, instruction:, args:)
+        struct = args.first
+        ObjectBuilder.new(builder:, mod: @module, struct:).to_ptr
       end
 
       # usage:
