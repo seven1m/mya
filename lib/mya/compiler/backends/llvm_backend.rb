@@ -60,7 +60,9 @@ class Compiler
 
       def build_function(function, instructions)
         function.basic_blocks.append.build do |builder|
-          @main_obj = ObjectBuilder.new(builder:, mod: @module).to_ptr
+          unused_for_now = LLVM::Int # need at least one struct member
+          main_obj_struct = LLVM::Struct(unused_for_now, 'main')
+          @main_obj = ObjectBuilder.new(builder:, mod: @module, struct: main_obj_struct).to_ptr
           @scope_stack << { function:, vars: {}, self_obj: @main_obj }
           build_instructions(function, builder, instructions) do |return_value|
             builder.ret return_value
