@@ -1,7 +1,6 @@
 require 'llvm/core'
 require 'llvm/execution_engine'
 require 'llvm/linker'
-require 'llvm/linker'
 require_relative 'llvm_backend/rc_builder'
 require_relative 'llvm_backend/array_builder'
 require_relative 'llvm_backend/object_builder'
