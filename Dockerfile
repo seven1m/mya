@@ -5,8 +5,6 @@ RUN apt-get update && \
   wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 17 && \
   gem install bundler
 
-RUN ln -s /usr/bin/lli-17 /usr/bin/lli
-
 COPY Gemfile /mya/Gemfile
 COPY Gemfile.lock /mya/Gemfile.lock
 WORKDIR /mya

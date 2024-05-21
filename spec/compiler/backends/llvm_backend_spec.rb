@@ -245,11 +245,14 @@ describe Compiler::Backends::LLVMBackend do
   end
 
   def lli
-    @lli ||= if system('command -v lli-17 2>/dev/null >/dev/null')
-               'lli-17'
-             else
-               'lli'
-             end
+    return @lli if @lli
+
+    major_version = LLVM::RUBY_LLVM_VERSION.split('.').first
+    @lli = if system("command -v lli-#{major_version} 2>/dev/null >/dev/null")
+             "lli-#{major_version}"
+           else
+             'lli'
+           end
   end
 
   it 'evaluates puts for both int and str' do
