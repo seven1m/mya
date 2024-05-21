@@ -245,11 +245,11 @@ describe Compiler::Backends::LLVMBackend do
   end
 
   def lli
-    @lli = if `command -v lli-17 2>/dev/null >/dev/null`
-             'lli-17'
-           else
-             'lli'
-           end
+    @lli ||= if system('command -v lli-17 2>/dev/null >/dev/null')
+               'lli-17'
+             else
+               'lli'
+             end
   end
 
   it 'evaluates puts for both int and str' do
