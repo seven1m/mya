@@ -102,8 +102,7 @@ class Compiler
         name = instruction.name
         attr_types = instruction.type!.attributes.values.map { |t| llvm_type(t) }
         klass = @classes[name] = LLVM::Struct(*attr_types, name.to_s)
-        # FIXME: to_s change to symbol plz
-        @methods[name.to_s] = { new: method(:build_call_new) }
+        @methods[name.to_sym] = { new: method(:build_call_new) }
         @scope_stack << { function:, vars: {}, self_obj: klass }
         build_instructions(function, builder, instruction.body)
         @scope_stack.pop
@@ -297,7 +296,7 @@ class Compiler
 
       def build_methods
         {
-          'array' => {
+          array: {
             first: -> (builder:, instruction:, args:) do
               element_type = llvm_type(instruction.type!)
               array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
@@ -314,14 +313,14 @@ class Compiler
               array.push(args.last)
             end,
           },
-          'int' => {
+          int: {
             '+': -> (builder:, args:, **) { builder.add(*args) },
             '-': -> (builder:, args:, **) { builder.sub(*args) },
             '*': -> (builder:, args:, **) { builder.mul(*args) },
             '/': -> (builder:, args:, **) { builder.sdiv(*args) },
             '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
           },
-          '(object main)' => {
+          '(object main)': {
             'puts': -> (builder:, args:, instruction:) do
               arg = args[1] # receiver is arg 0
               arg_type = instruction.type!.types[1].to_sym

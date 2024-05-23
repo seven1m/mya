@@ -44,7 +44,7 @@ class Compiler
 
     attr_accessor :name, :types
 
-    def name_for_method_lookup = name
+    def name_for_method_lookup = name.to_sym
 
     def to_s
       case types.size
@@ -171,7 +171,7 @@ class Compiler
 
     def inspect = "#<ClassType class_name=#{class_name.inspect} attributes=#{attributes.inspect}>"
 
-    def name_for_method_lookup = class_name
+    def name_for_method_lookup = class_name.to_sym
   end
 
   class ObjectType < TypeOperator
@@ -185,7 +185,7 @@ class Compiler
 
     def inspect = "#<ObjectType klass=#{klass.inspect}>"
 
-    def name_for_method_lookup = to_s
+    def name_for_method_lookup = to_s.to_sym
   end
 
   IntType = TypeOperator.new('int', [])
@@ -585,10 +585,10 @@ class Compiler
       array_type = TypeVariable.new(self)
       array = AryType.new(array_type)
       {
-        '(object main)' => {
+        '(object main)': {
           puts: MethodType.new(MainObject, UnionType.new(IntType, StrType), IntType),
         },
-        'int' => {
+        int: {
           zero?: MethodType.new(IntType, BoolType),
           "+": MethodType.new(IntType, IntType, IntType),
           "==": MethodType.new(IntType, IntType, BoolType),
@@ -596,7 +596,7 @@ class Compiler
           "*": MethodType.new(IntType, IntType, IntType),
           "/": MethodType.new(IntType, IntType, IntType),
         },
-        'array' => {
+        array: {
           nth: MethodType.new(array, IntType, array_type),
           first: MethodType.new(array, array_type),
           last: MethodType.new(array, array_type),
