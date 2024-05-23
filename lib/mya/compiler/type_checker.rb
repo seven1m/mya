@@ -571,8 +571,6 @@ class Compiler
       scope.fetch(:vars)
     end
 
-    # FIXME: rename and rearrange these!!!!!!!!!!!!!!!!!!!!!!!!!!
-
     def current_class_type
       scope.fetch(:self_type)
     end

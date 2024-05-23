@@ -73,7 +73,6 @@ class Compiler
 
       def build_instructions(function, builder, instructions)
         instructions.each do |instruction|
-          # FIXME: discard unused stack values
           build(instruction, function, builder)
         end
         return_value = @stack.pop
