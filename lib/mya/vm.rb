@@ -5,9 +5,7 @@ class VM
       @methods = {}
     end
 
-    attr_reader :methods
-
-    attr_reader :name
+    attr_reader :methods, :name
 
     def new
       ObjectType.new(self)
@@ -29,22 +27,18 @@ class VM
     end
   end
 
-  MainClass = ClassType.new('main')
+  MainClass = ClassType.new("main")
   MainObject = ObjectType.new(MainClass)
 
   def initialize(instructions, io: $stdout)
     @instructions = instructions
     @stack = []
-    @frames = [
-      { instructions:, return_index: nil }
-    ]
+    @frames = [{ instructions:, return_index: nil }]
     @scope_stack = [{ args: [], vars: {}, self_obj: MainObject }]
     @if_depth = 0
     @classes = {}
     @io = io
   end
-
-  attr_reader :instructions
 
   def run
     @index = 0
@@ -68,7 +62,10 @@ class VM
   end
 
   BUILT_IN_METHODS = {
-    'puts': ->(arg, io:) { io.puts(arg); arg.to_s.size },
+    puts: ->(arg, io:) do
+      io.puts(arg)
+      arg.to_s.size
+    end
   }.freeze
 
   def execute(instruction)
@@ -88,7 +85,7 @@ class VM
   def execute_call(instruction)
     new_args = @stack.pop(instruction.arg_count)
 
-    receiver = @stack.pop or raise(ArgumentError, 'No receiver')
+    receiver = @stack.pop or raise(ArgumentError, "No receiver")
     name = instruction.name
     if receiver.respond_to?(name)
       @stack << receiver.send(name, *new_args)
@@ -151,7 +148,7 @@ class VM
     @stack << instruction.value
   end
 
-  def execute_push_self(instruction)
+  def execute_push_self(_instruction)
     @stack << self_obj
   end
 

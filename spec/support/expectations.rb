@@ -1,12 +1,12 @@
-require 'minitest/assertions'
-require 'tempfile'
-require 'pp'
+require "minitest/assertions"
+require "tempfile"
+require "pp"
 
 module Minitest::Assertions
   def assert_equal_with_diff(expected, actual)
     if expected != actual
-      expected_file = Tempfile.new('expected')
-      actual_file = Tempfile.new('actual')
+      expected_file = Tempfile.new("expected")
+      actual_file = Tempfile.new("actual")
       PP.pp(expected, expected_file)
       PP.pp(actual, actual_file)
       expected_file.close
@@ -19,7 +19,7 @@ module Minitest::Assertions
   end
 end
 
-require 'minitest/spec'
+require "minitest/spec"
 
 module Minitest::Expectations
   Enumerable.infect_an_assertion :assert_equal_with_diff, :must_equal_with_diff

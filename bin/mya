@@ -1,26 +1,21 @@
 #!/usr/bin/env ruby
 
-require_relative '../lib/mya'
+require_relative "../lib/mya"
 
 args = ARGV.dup
-dump_llvm = args.delete('--dump-llvm')
-llvm = args.delete('--llvm') || dump_llvm
-dump_ir = args.delete('--dump-ir')
+dump_llvm = args.delete("--dump-llvm")
+llvm = args.delete("--llvm") || dump_llvm
+dump_ir = args.delete("--dump-ir")
 
-code = if args.first == '-e'
-         args[1]
-       else
-         File.read(args.first)
-       end
+code =
+  if args.first == "-e"
+    args[1]
+  else
+    File.read(args.first)
+  end
 
 instructions = Compiler.new(code).compile
 
-if dump_ir
-  pp instructions.map(&:to_h)
-end
+pp instructions.map(&:to_h) if dump_ir
 
-if llvm
-  Compiler::Backends::LLVMBackend.new(instructions, dump: dump_llvm).run
-else
-  VM.new(instructions).run
-end
+llvm ? Compiler::Backends::LLVMBackend.new(instructions, dump: dump_llvm).run : VM.new(instructions).run

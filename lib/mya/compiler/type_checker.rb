@@ -1,5 +1,3 @@
-require 'set'
-
 class Compiler
   class TypeVariable
     def initialize(type_checker)
@@ -53,7 +51,7 @@ class Compiler
       when 2
         "(#{types[0]} #{name} #{types[1]})"
       else
-        "#{name} #{types.join(' ')}"
+        "#{name} #{types.join(" ")}"
       end
     end
 
@@ -62,7 +60,7 @@ class Compiler
     end
 
     def inspect
-      "#<TypeOperator name=#{name} types=[#{types.join(', ')}]>"
+      "#<TypeOperator name=#{name} types=[#{types.join(", ")}]>"
     end
 
     def non_generic!
@@ -71,13 +69,11 @@ class Compiler
     end
 
     def prune
-      dup.tap do |new_type|
-        new_type.types = types.map(&:prune)
-      end
+      dup.tap { |new_type| new_type.types = types.map(&:prune) }
     end
 
     def contains?(other_type)
-      raise 'expected TypeVariable' unless other_type.is_a?(TypeVariable)
+      raise "expected TypeVariable" unless other_type.is_a?(TypeVariable)
 
       types.any? do |candidate|
         case candidate
@@ -96,16 +92,16 @@ class Compiler
 
   class MethodType < TypeOperator
     def initialize(*types)
-      super('->', types)
+      super("->", types)
     end
 
     def to_s
       *arg_types, return_type = types
-      "([#{arg_types.join(', ')}] -> #{return_type})"
+      "([#{arg_types.join(", ")}] -> #{return_type})"
     end
 
     def inspect
-      "#<MethodType types=[#{types.map(&:inspect).join(', ')}]>"
+      "#<MethodType types=[#{types.map(&:inspect).join(", ")}]>"
     end
 
     def evaluated_type = types.last
@@ -115,29 +111,27 @@ class Compiler
   # We could easily use MethodType, but would lose some context when puts debugging. :-)
   class CallType < MethodType
     def inspect
-      super.sub('MethodType', 'CallType')
+      super.sub("MethodType", "CallType")
     end
   end
 
   class UnionType < TypeOperator
     def initialize(*types)
-      super('union', types)
+      super("union", types)
     end
 
     def to_s
-      "(#{types.join(' | ')})"
+      "(#{types.join(" | ")})"
     end
 
     def select_type(other_type)
-      types.detect do |candidate|
-        candidate.name == other_type.name && candidate.types.size == other_type.types.size
-      end
+      types.detect { |candidate| candidate.name == other_type.name && candidate.types.size == other_type.types.size }
     end
   end
 
   class AryType < TypeOperator
     def initialize(type)
-      super('array', [type])
+      super("array", [type])
     end
 
     def to_s
@@ -147,7 +141,7 @@ class Compiler
 
   class NillableType < TypeOperator
     def initialize(type)
-      super('nillable', [type])
+      super("nillable", [type])
     end
 
     def to_s
@@ -165,7 +159,7 @@ class Compiler
     attr_reader :attributes
 
     def to_s
-      attrs = attributes.map { |name, type| "#{name}:#{type}" }.join(', ')
+      attrs = attributes.map { |name, type| "#{name}:#{type}" }.join(", ")
       "(class #{class_name} #{attrs})"
     end
 
@@ -176,7 +170,7 @@ class Compiler
 
   class ObjectType < TypeOperator
     def initialize(klass)
-      super('object', [klass])
+      super("object", [klass])
     end
 
     def klass = types.first
@@ -188,19 +182,24 @@ class Compiler
     def name_for_method_lookup = to_s.to_sym
   end
 
-  IntType = TypeOperator.new('int', [])
-  StrType = TypeOperator.new('str', [])
-  NilType = TypeOperator.new('nil', [])
-  BoolType = TypeOperator.new('bool', [])
+  IntType = TypeOperator.new("int", [])
+  StrType = TypeOperator.new("str", [])
+  NilType = TypeOperator.new("nil", [])
+  BoolType = TypeOperator.new("bool", [])
 
   class TypeChecker
-    class Error < StandardError; end
-    class RecursiveUnification < Error; end
-    class TypeClash < Error; end
-    class UndefinedMethod < Error; end
-    class UndefinedVariable < Error; end
+    class Error < StandardError
+    end
+    class RecursiveUnification < Error
+    end
+    class TypeClash < Error
+    end
+    class UndefinedMethod < Error
+    end
+    class UndefinedVariable < Error
+    end
 
-    MainClass = ClassType.new('main')
+    MainClass = ClassType.new("main")
     MainObject = ObjectType.new(MainClass)
 
     def initialize
@@ -231,7 +230,7 @@ class Compiler
       if @next_variable_name
         @next_variable_name = @next_variable_name.succ
       else
-        @next_variable_name = 'a'
+        @next_variable_name = "a"
       end
     end
 
@@ -244,9 +243,7 @@ class Compiler
     end
 
     def analyze_array_of_instructions(array)
-      array.map do |instruction|
-        analyze_instruction(instruction)
-      end.last
+      array.map { |instruction| analyze_instruction(instruction) }.last
     end
 
     def analyze_call(instruction)
@@ -273,7 +270,9 @@ class Compiler
 
     def analyze_call_with_known_receiver(type_of_receiver:, type_of_call:, instruction:)
       type_of_method = retrieve_method(type_of_receiver, instruction.name)
-      raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver.inspect}" unless type_of_method
+      unless type_of_method
+        raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver.inspect}"
+      end
 
       unify_type(type_of_method, type_of_call, instruction)
     end
@@ -281,9 +280,7 @@ class Compiler
     def analyze_class(instruction)
       class_type = @classes[instruction.name] = ClassType.new(instruction.name)
       object_type = ObjectType.new(class_type)
-      @methods[class_type.name_for_method_lookup] = {
-        new: MethodType.new(class_type, object_type)
-      }
+      @methods[class_type.name_for_method_lookup] = { new: MethodType.new(class_type, object_type) }
 
       @scope_stack << { vars: {}, self_type: class_type }
       analyze_instruction(instruction.body)
@@ -298,9 +295,7 @@ class Compiler
       @methods[current_object_type&.name_for_method_lookup][instruction.name] = placeholder_var.non_generic!
 
       new_vars = {}
-      parameter_types = instruction.params.map do |param|
-        new_vars[param] = TypeVariable.new(self).non_generic!
-      end
+      parameter_types = instruction.params.map { |param| new_vars[param] = TypeVariable.new(self).non_generic! }
 
       @scope_stack << scope.merge(parameter_types:, vars: new_vars)
       type_of_body = analyze_instruction(instruction.body)
@@ -316,7 +311,7 @@ class Compiler
     end
 
     def analyze_if(instruction)
-      condition = pop
+      _condition = pop
       type_of_then = analyze_instruction(instruction.if_true)
       type_of_else = analyze_instruction(instruction.if_false)
       unify_type(type_of_then, type_of_else, instruction)
@@ -344,9 +339,7 @@ class Compiler
           end
         end
       end
-      members.each_cons(2) do |a, b|
-        unify_type(a, b, instruction)
-      end
+      members.each_cons(2) { |a, b| unify_type(a, b, instruction) }
       member_type = members.first || TypeVariable.new(self)
       member_type.non_generic!
       type_of_array = AryType.new(member_type)
@@ -448,9 +441,7 @@ class Compiler
           type
         end
       when TypeOperator
-        type.dup.tap do |new_type|
-          new_type.types = type.types.map { |t| fresh_type(t, env) }
-        end
+        type.dup.tap { |new_type| new_type.types = type.types.map { |t| fresh_type(t, env) } }
       end
     end
 
@@ -467,14 +458,12 @@ class Compiler
       end
     end
 
-    def unify_type_variable(a, b, instruction)
+    def unify_type_variable(a, b, _instruction)
       return if a == b
 
-      if b.is_a?(TypeOperator) && b.contains?(a)
-        raise RecursiveUnification, "recursive unification: #{b} contains #{a}"
-      else
-        a.instance = b
-      end
+      raise RecursiveUnification, "recursive unification: #{b} contains #{a}" if b.is_a?(TypeOperator) && b.contains?(a)
+
+      a.instance = b
     end
 
     def unify_type_operator(a, b, instruction)
@@ -496,7 +485,7 @@ class Compiler
     end
 
     def unify_nillable_type(a, b, instruction)
-      return if b.name == 'nil'
+      return if b.name == "nil"
 
       if b.is_a?(NillableType)
         unify_type(a.types.first, b.types.first, instruction)
@@ -516,9 +505,7 @@ class Compiler
     end
 
     def unify_type_operator_with_type_operator(a, b, instruction)
-      unless a.name == b.name && a.types.size == b.types.size
-        raise_type_clash_error(a, b, instruction)
-      end
+      raise_type_clash_error(a, b, instruction) unless a.name == b.name && a.types.size == b.types.size
 
       begin
         unify_args(a.types, b.types, instruction)
@@ -530,24 +517,23 @@ class Compiler
     end
 
     def unify_args(list1, list2, instruction)
-      list1.zip(list2) do |a, b|
-        unify_type(a, b, instruction)
-      end
+      list1.zip(list2) { |a, b| unify_type(a, b, instruction) }
     end
 
     def raise_type_clash_error(a, b, instruction = nil)
-      message = case instruction
-      when CallInstruction
-        "#{a} cannot unify with #{b} in call to #{instruction.name} on line #{instruction.line}"
-      when IfInstruction
-        "one branch of `if` has type #{a} and the other has type #{b}"
-      when SetVarInstruction
-        "the variable #{instruction.name} has type #{a} already; you cannot change it to type #{b}"
-      when PushArrayInstruction
-        "the array contains type #{a} but you are trying to push type #{b}"
-      else
-        "#{a} cannot unify with #{b} #{instruction.inspect}"
-      end
+      message =
+        case instruction
+        when CallInstruction
+          "#{a} cannot unify with #{b} in call to #{instruction.name} on line #{instruction.line}"
+        when IfInstruction
+          "one branch of `if` has type #{a} and the other has type #{b}"
+        when SetVarInstruction
+          "the variable #{instruction.name} has type #{a} already; you cannot change it to type #{b}"
+        when PushArrayInstruction
+          "the array contains type #{a} but you are trying to push type #{b}"
+        else
+          "#{a} cannot unify with #{b} #{instruction.inspect}"
+        end
       raise TypeClash, message
     end
 
@@ -559,12 +545,12 @@ class Compiler
       end
 
       value = @stack.pop
-      raise 'Nothing on stack!' unless value
+      raise "Nothing on stack!" unless value
       value
     end
 
     def scope
-      @scope_stack.last or raise('No scope!')
+      @scope_stack.last or raise("No scope!")
     end
 
     def vars
@@ -583,8 +569,8 @@ class Compiler
       array_type = TypeVariable.new(self)
       array = AryType.new(array_type)
       {
-        '(object main)': {
-          puts: MethodType.new(MainObject, UnionType.new(IntType, StrType), IntType),
+        "(object main)": {
+          puts: MethodType.new(MainObject, UnionType.new(IntType, StrType), IntType)
         },
         int: {
           zero?: MethodType.new(IntType, BoolType),
@@ -592,18 +578,16 @@ class Compiler
           "==": MethodType.new(IntType, IntType, BoolType),
           "-": MethodType.new(IntType, IntType, IntType),
           "*": MethodType.new(IntType, IntType, IntType),
-          "/": MethodType.new(IntType, IntType, IntType),
+          "/": MethodType.new(IntType, IntType, IntType)
         },
         array: {
           nth: MethodType.new(array, IntType, array_type),
           first: MethodType.new(array, array_type),
           last: MethodType.new(array, array_type),
-          '<<': MethodType.new(array, array_type, array),
-          push: MethodType.new(array, array_type, array_type),
-        },
-      }.tap do |hash|
-        hash.default_proc = proc { |hash, key| hash[key] = {} }
-      end
+          "<<": MethodType.new(array, array_type, array),
+          push: MethodType.new(array, array_type, array_type)
+        }
+      }.tap { |hash| hash.default_proc = proc { |h, key| h[key] = {} } }
     end
   end
 end

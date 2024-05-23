@@ -1,2 +1,2 @@
-require_relative './mya/compiler'
-require_relative './mya/vm'
+require_relative "mya/compiler"
+require_relative "mya/vm"

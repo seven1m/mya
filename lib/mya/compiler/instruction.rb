@@ -8,10 +8,6 @@ class Compiler
 
     attr_writer :type
 
-    def to_h
-      raise NotImplementedError, __method__
-    end
-
     def type!
       return @pruned_type if @pruned_type
 
@@ -24,14 +20,11 @@ class Compiler
     end
 
     def inspect
-      "<#{self.class.name} #{instance_variables.map { |iv| "#{iv}=#{instance_variable_get(iv).inspect}" }.join(' ')}>"
+      "<#{self.class.name} #{instance_variables.map { |iv| "#{iv}=#{instance_variable_get(iv).inspect}" }.join(" ")}>"
     end
 
     def to_h
-      {
-        type: type!.to_s,
-        instruction: instruction_name,
-      }
+      { type: type!.to_s, instruction: instruction_name }
     end
   end
 
@@ -195,10 +188,7 @@ class Compiler
     def instruction_name = :if
 
     def to_h
-      super.merge(
-        if_true: if_true.map(&:to_h),
-        if_false: if_false.map(&:to_h)
-      )
+      super.merge(if_true: if_true.map(&:to_h), if_false: if_false.map(&:to_h))
     end
   end
 
@@ -218,11 +208,7 @@ class Compiler
     def return_type = type!.types.last
 
     def to_h
-      super.merge(
-        name:,
-        params:,
-        body: body.map(&:to_h)
-      )
+      super.merge(name:, params:, body: body.map(&:to_h))
     end
   end
 
@@ -238,10 +224,7 @@ class Compiler
     def instruction_name = :class
 
     def to_h
-      super.merge(
-        name:,
-        body: body.map(&:to_h)
-      )
+      super.merge(name:, body: body.map(&:to_h))
     end
   end
 

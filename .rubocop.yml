@@ -1,5 +1,17 @@
+inherit_gem:
+  syntax_tree: config/rubocop.yml
+
+require: rubocop-minitest
+
+AllCops:
+  NewCops: enable
+  SuggestExtensions: false
+
 Layout/LeadingCommentSpace:
   Enabled: false
+
+Layout/LineLength:
+  Max: 120
 
 Lint/BooleanSymbol:
   Enabled: false
@@ -7,13 +19,13 @@ Lint/BooleanSymbol:
 Metrics:
   Enabled: false
 
-Metrics/LineLength:
-  Max: 120
-
 Naming/MethodParameterName:
   Enabled: false
 
 Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/ConditionalAssignment:
   Enabled: false
 
 Style/Documentation:
@@ -22,5 +34,11 @@ Style/Documentation:
 Style/FrozenStringLiteralComment:
   Enabled: false
 
+Style/IfUnlessModifier:
+  Enabled: false
+
 Style/NumericPredicate:
+  Enabled: false
+
+Style/PerlBackrefs:
   Enabled: false

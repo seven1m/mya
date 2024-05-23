@@ -1,15 +1,15 @@
-require 'llvm/core'
-require 'llvm/execution_engine'
-require 'llvm/linker'
-require_relative 'llvm_backend/rc_builder'
-require_relative 'llvm_backend/array_builder'
-require_relative 'llvm_backend/object_builder'
-require_relative 'llvm_backend/string_builder'
+require "llvm/core"
+require "llvm/execution_engine"
+require "llvm/linker"
+require_relative "llvm_backend/rc_builder"
+require_relative "llvm_backend/array_builder"
+require_relative "llvm_backend/object_builder"
+require_relative "llvm_backend/string_builder"
 
 class Compiler
   module Backends
     class LLVMBackend
-      LIB_PATH = File.expand_path('../../../../build/lib.ll', __dir__)
+      LIB_PATH = File.expand_path("../../../../build/lib.ll", __dir__)
 
       def initialize(instructions, dump: false)
         @instructions = instructions
@@ -49,9 +49,9 @@ class Compiler
       end
 
       def build_module
-        @module = LLVM::Module.new('llvm')
+        @module = LLVM::Module.new("llvm")
         @return_type = @instructions.last.type!
-        @entry = @module.functions.add('main', [], llvm_type(@return_type))
+        @entry = @module.functions.add("main", [], llvm_type(@return_type))
         build_function(@entry, @instructions)
         @lib.link_into(@module)
         #@module.dump if @dump || !@module.valid?
@@ -61,20 +61,16 @@ class Compiler
       def build_function(function, instructions)
         function.basic_blocks.append.build do |builder|
           unused_for_now = LLVM::Int # need at least one struct member
-          main_obj_struct = LLVM::Struct(unused_for_now, 'main')
+          main_obj_struct = LLVM.Struct(unused_for_now, "main")
           @main_obj = ObjectBuilder.new(builder:, mod: @module, struct: main_obj_struct).to_ptr
           @scope_stack << { function:, vars: {}, self_obj: @main_obj }
-          build_instructions(function, builder, instructions) do |return_value|
-            builder.ret return_value
-          end
+          build_instructions(function, builder, instructions) { |return_value| builder.ret return_value }
           @scope_stack.pop
         end
       end
 
       def build_instructions(function, builder, instructions)
-        instructions.each do |instruction|
-          build(instruction, function, builder)
-        end
+        instructions.each { |instruction| build(instruction, function, builder) }
         return_value = @stack.pop
         yield return_value if block_given?
       end
@@ -89,18 +85,15 @@ class Compiler
         receiver_type = instruction.type!.types.first
         args.unshift(receiver)
         name = instruction.name
-        fn = @methods.dig(receiver_type.name_for_method_lookup, name) or raise(NoMethodError, "Method '#{name}' not found")
-        if fn.respond_to?(:call)
-          @stack << fn.call(builder:, instruction:, args:)
-        else
-          @stack << builder.call(fn, *args)
-        end
+        fn = @methods.dig(receiver_type.name_for_method_lookup, name) or
+          raise(NoMethodError, "Method '#{name}' not found")
+        fn.respond_to?(:call) ? @stack << fn.call(builder:, instruction:, args:) : @stack << builder.call(fn, *args)
       end
 
       def build_class(instruction, function, builder)
         name = instruction.name
         attr_types = instruction.type!.attributes.values.map { |t| llvm_type(t) }
-        klass = @classes[name] = LLVM::Struct(*attr_types, name.to_s)
+        klass = @classes[name] = LLVM.Struct(*attr_types, name.to_s)
         @methods[name.to_sym] = { new: method(:build_call_new) }
         @scope_stack << { function:, vars: {}, self_obj: klass }
         build_instructions(function, builder, instruction.body)
@@ -109,14 +102,13 @@ class Compiler
 
       def build_def(instruction, _function, _builder)
         name = instruction.name
-        param_types = (0...instruction.params.size).map do |i|
-          llvm_type(instruction.body.fetch(i * 2).type!)
-        end
+        param_types = (0...instruction.params.size).map { |i| llvm_type(instruction.body.fetch(i * 2).type!) }
         receiver_type = instruction.receiver_type
         param_types.unshift(llvm_type(receiver_type))
         return_type = llvm_type(instruction.return_type)
         @methods[receiver_type.name_for_method_lookup] ||= {}
-        @methods[receiver_type.name_for_method_lookup][name] = fn = @module.functions.add(name, param_types, return_type)
+        @methods[receiver_type.name_for_method_lookup][name] = fn =
+          @module.functions.add(name, param_types, return_type)
         build_function(fn, instruction.body)
       end
 
@@ -165,14 +157,14 @@ class Compiler
       end
 
       def build_push_int(instruction, _function, _builder)
-        @stack << LLVM::Int(instruction.value)
+        @stack << LLVM.Int(instruction.value)
       end
 
       def build_push_nil(_instruction, _function, _builder)
         @stack << RcBuilder.pointer_type.null_pointer
       end
 
-      def build_push_self(instruction, _function, builder)
+      def build_push_self(_instruction, _function, _builder)
         @stack << self_obj
       end
 
@@ -189,10 +181,9 @@ class Compiler
         @stack << builder.load(variable)
       end
 
-      def build_set_ivar(instruction, _function, builder)
-        value = @stack.last
-        #self_obj.set_ivar(instruction.name, value)
-
+      def build_set_ivar(_instruction, _function, _builder)
+        # value = @stack.last
+        # self_obj.set_ivar(instruction.name, value)
       end
 
       def build_set_var(instruction, _function, builder)
@@ -235,14 +226,9 @@ class Compiler
           ptr = read_rc_pointer(value)
           read_llvm_type_as_ruby(ptr, type)
         else
-          if type.name == 'nillable'
-            if (ptr = read_rc_pointer(value, nillable: true))
-              read_llvm_type_as_ruby(ptr, type.types.first)
-            else
-              nil
-            end
-          else
-            raise "Unknown type: #{type.inspect}"
+          raise "Unknown type: #{type.inspect}" unless type.name == "nillable"
+          if (ptr = read_rc_pointer(value, nillable: true))
+            read_llvm_type_as_ruby(ptr, type.types.first)
           end
         end
       end
@@ -286,41 +272,41 @@ class Compiler
       end
 
       def fn_puts_int
-        @fn_puts_int ||= @module.functions.add('puts_int', [LLVM::Int32], LLVM::Int32)
+        @fn_puts_int ||= @module.functions.add("puts_int", [LLVM::Int32], LLVM::Int32)
       end
 
       def fn_puts_str
-        @fn_puts_str ||= @module.functions.add('puts_str', [RcBuilder.pointer_type], LLVM::Int32)
+        @fn_puts_str ||= @module.functions.add("puts_str", [RcBuilder.pointer_type], LLVM::Int32)
       end
 
       def build_methods
         {
           array: {
-            first: -> (builder:, instruction:, args:) do
+            first: ->(builder:, instruction:, args:) do
               element_type = llvm_type(instruction.type!)
               array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
               array.first
             end,
-            last: -> (builder:, instruction:, args:) do
+            last: ->(builder:, instruction:, args:) do
               element_type = llvm_type(instruction.type!)
               array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
               array.last
             end,
-            '<<': -> (builder:, instruction:, args:) do
+            "<<": ->(builder:, args:, **) do
               element_type = args.last.type
               array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
               array.push(args.last)
-            end,
+            end
           },
           int: {
-            '+': -> (builder:, args:, **) { builder.add(*args) },
-            '-': -> (builder:, args:, **) { builder.sub(*args) },
-            '*': -> (builder:, args:, **) { builder.mul(*args) },
-            '/': -> (builder:, args:, **) { builder.sdiv(*args) },
-            '==': -> (builder:, args:, **) { builder.icmp(:eq, *args) },
+            "+": ->(builder:, args:, **) { builder.add(*args) },
+            "-": ->(builder:, args:, **) { builder.sub(*args) },
+            "*": ->(builder:, args:, **) { builder.mul(*args) },
+            "/": ->(builder:, args:, **) { builder.sdiv(*args) },
+            "==": ->(builder:, args:, **) { builder.icmp(:eq, *args) }
           },
-          '(object main)': {
-            'puts': -> (builder:, args:, instruction:) do
+          "(object main)": {
+            puts: ->(builder:, args:, instruction:) do
               arg = args[1] # receiver is arg 0
               arg_type = instruction.type!.types[1].to_sym
               case arg_type
@@ -336,7 +322,7 @@ class Compiler
         }
       end
 
-      def build_call_new(builder:, instruction:, args:)
+      def build_call_new(builder:, args:, **)
         struct = args.first
         ObjectBuilder.new(builder:, mod: @module, struct:).to_ptr
       end

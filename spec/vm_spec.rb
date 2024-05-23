@@ -1,5 +1,5 @@
-require_relative './spec_helper'
-require 'stringio'
+require_relative "spec_helper"
+require "stringio"
 
 describe VM do
   def execute(code, io: $stdout)
@@ -7,24 +7,24 @@ describe VM do
     VM.new(instructions, io:).run
   end
 
-  it 'evaluates integers' do
-    expect(execute('1')).must_equal(1)
+  it "evaluates integers" do
+    expect(execute("1")).must_equal(1)
   end
 
-  it 'evaluates strings' do
-    expect(execute('"foo"')).must_equal('foo')
+  it "evaluates strings" do
+    expect(execute('"foo"')).must_equal("foo")
   end
 
-  it 'evaluates nil' do
-    expect(execute('nil')).must_be_nil
+  it "evaluates nil" do
+    expect(execute("nil")).must_be_nil
   end
 
-  it 'evaluates booleans' do
-    expect(execute('true')).must_equal(true)
-    expect(execute('false')).must_equal(false)
+  it "evaluates booleans" do
+    expect(execute("true")).must_equal(true)
+    expect(execute("false")).must_equal(false)
   end
 
-  it 'evaluates classes' do
+  it "evaluates classes" do
     code = <<~CODE
       class Foo
         def bar
@@ -36,11 +36,11 @@ describe VM do
     expect(execute(code)).must_equal(1)
   end
 
-  it 'evaluates variables set and get' do
-    expect(execute('a = 1; a')).must_equal(1)
+  it "evaluates variables set and get" do
+    expect(execute("a = 1; a")).must_equal(1)
   end
 
-  it 'evaluates arrays' do
+  it "evaluates arrays" do
     code = <<~CODE
       a = [1, 2, 3]
       a.first
@@ -73,25 +73,25 @@ describe VM do
       a << "bar"
       a.last
     CODE
-    expect(execute(code)).must_equal('bar')
+    expect(execute(code)).must_equal("bar")
 
     code = <<~CODE
       a = ["foo", "bar", "baz"]
       a.first
     CODE
-    expect(execute(code)).must_equal('foo')
+    expect(execute(code)).must_equal("foo")
 
     code = <<~CODE
       a = ["foo", "bar", "baz"]
       a.last
     CODE
-    expect(execute(code)).must_equal('baz')
+    expect(execute(code)).must_equal("baz")
 
     code = <<~CODE
       a = [nil, "foo", "bar"]
       a.last
     CODE
-    expect(execute(code)).must_equal('bar')
+    expect(execute(code)).must_equal("bar")
 
     code = <<~CODE
       a = ["foo", "bar", nil]
@@ -108,7 +108,7 @@ describe VM do
     expect(execute(code)).must_be_nil
   end
 
-  it 'evaluates method definitions' do
+  it "evaluates method definitions" do
     code = <<~CODE
       def foo
         'foo'
@@ -116,10 +116,10 @@ describe VM do
 
       foo
     CODE
-    expect(execute(code)).must_equal('foo')
+    expect(execute(code)).must_equal("foo")
   end
 
-  it 'evaluates method definitions with arguments' do
+  it "evaluates method definitions with arguments" do
     code = <<~CODE
       def bar(x)
         x
@@ -134,7 +134,7 @@ describe VM do
     expect(execute(code)).must_equal(90)
   end
 
-  it 'does not stomp on method arguments' do
+  it "does not stomp on method arguments" do
     code = <<~CODE
       def bar(b)
         b
@@ -150,13 +150,13 @@ describe VM do
     expect(execute(code)).must_equal(100)
   end
 
-  it 'evaluates operator expressions' do
-    expect(execute('1 + 2')).must_equal 3
-    expect(execute('3 == 3')).must_equal true
-    expect(execute('3 == 4')).must_equal false
+  it "evaluates operator expressions" do
+    expect(execute("1 + 2")).must_equal 3
+    expect(execute("3 == 3")).must_equal true
+    expect(execute("3 == 4")).must_equal false
   end
 
-  it 'evaluates if expressions' do
+  it "evaluates if expressions" do
     code = <<~CODE
       if false
         if true
@@ -211,7 +211,7 @@ describe VM do
     expect(execute(code)).must_equal(5)
   end
 
-  it 'evaluates puts for both int and str' do
+  it "evaluates puts for both int and str" do
     code = <<~CODE
       puts(123)
       puts("foo")
@@ -230,7 +230,7 @@ describe VM do
     io.read
   end
 
-  it 'evaluates nillable strings' do
+  it "evaluates nillable strings" do
     code = <<~CODE
       a = "foo" # a:nillable
       a = nil
@@ -243,16 +243,16 @@ describe VM do
       a = "foo"
       a
     CODE
-    expect(execute(code)).must_equal('foo')
+    expect(execute(code)).must_equal("foo")
   end
 
-  it 'evaluates examples/fib.rb' do
-    result = execute_file(File.expand_path('../examples/fib.rb', __dir__))
-    expect(result).must_equal("55\n");
+  it "evaluates examples/fib.rb" do
+    result = execute_file(File.expand_path("../examples/fib.rb", __dir__))
+    expect(result).must_equal("55\n")
   end
 
-  it 'evaluates examples/fact.rb' do
-    result = execute_file(File.expand_path('../examples/fact.rb', __dir__))
+  it "evaluates examples/fact.rb" do
+    result = execute_file(File.expand_path("../examples/fact.rb", __dir__))
     expect(result).must_equal("3628800\n")
   end
 end

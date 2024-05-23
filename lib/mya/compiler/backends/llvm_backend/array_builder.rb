@@ -6,22 +6,16 @@ class Compiler
           super(builder:, mod:, ptr:)
           @element_type = element_type
 
-          unless ptr
-            ary_ptr = builder.array_malloc(element_type, LLVM::Int(elements.size))
-            store_ptr(ary_ptr)
+          return if ptr
+          ary_ptr = builder.array_malloc(element_type, LLVM.Int(elements.size))
+          store_ptr(ary_ptr)
 
-            elements.each_with_index do |element, index|
-              gep = builder.gep2(
-                LLVM::Type.array(element_type),
-                ary_ptr,
-                [LLVM::Int(0), LLVM::Int(index)],
-                ''
-              )
-              builder.store(element, gep)
-            end
-
-            store_size(elements.size)
+          elements.each_with_index do |element, index|
+            gep = builder.gep2(LLVM::Type.array(element_type), ary_ptr, [LLVM.Int(0), LLVM.Int(index)], "")
+            builder.store(element, gep)
           end
+
+          store_size(elements.size)
         end
 
         def first

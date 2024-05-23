@@ -1,9 +1,8 @@
-FROM ubuntu:23.10
+FROM ruby:3.3-bullseye
 
 RUN apt-get update && \
-  apt-get install -y -q build-essential ruby ruby-dev git wget lsb-release software-properties-common gnupg clang && \
-  wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 17 && \
-  gem install bundler
+  apt-get install -y -q build-essential lsb-release software-properties-common gnupg clang && \
+  wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 17
 
 COPY Gemfile /mya/Gemfile
 COPY Gemfile.lock /mya/Gemfile.lock

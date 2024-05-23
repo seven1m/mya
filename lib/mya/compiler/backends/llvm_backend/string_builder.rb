@@ -7,21 +7,25 @@ class Compiler
 
           string = string.to_s
 
-          unless ptr
-            str = LLVM::ConstantArray.string(string)
-            str_ptr = @builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
-            @builder.store(str, str_ptr)
-            @builder.call(fn_rc_set_str, @ptr, str_ptr, LLVM::Int(string.bytesize))
+          return if ptr
+          str = LLVM::ConstantArray.string(string)
+          str_ptr = @builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
+          @builder.store(str, str_ptr)
+          @builder.call(fn_rc_set_str, @ptr, str_ptr, LLVM.Int(string.bytesize))
 
-            store_size(string.bytesize)
-          end
+          store_size(string.bytesize)
         end
 
         def fn_rc_set_str
           return @fn_rc_set_str if @fn_rc_set_str
 
-          @fn_rc_set_str = @module.functions['rc_set_str'] ||
-            @module.functions.add('rc_set_str', [pointer_type, LLVM::Type.pointer(LLVM::UInt8), LLVM::UInt32], LLVM::Type.void)
+          @fn_rc_set_str =
+            @module.functions["rc_set_str"] ||
+              @module.functions.add(
+                "rc_set_str",
+                [pointer_type, LLVM::Type.pointer(LLVM::UInt8), LLVM::UInt32],
+                LLVM::Type.void
+              )
         end
       end
     end

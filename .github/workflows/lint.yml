@@ -1,4 +1,4 @@
-name: Specs
+name: Lint
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  specs:
+  lint:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -15,5 +15,5 @@ jobs:
           submodules: "recursive"
       - name: build docker image
         run: docker build . -t mya
-      - name: run specs
-        run: docker run mya bundle exec rake spec
+      - name: run lint
+        run: docker run mya bundle exec rake lint
