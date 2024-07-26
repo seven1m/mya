@@ -8,8 +8,7 @@
     }
   },
   "env": {
-    "LD_LIBRARY_PATH": "$DEVBOX_PACKAGES_DIR/lib",
-    "DYLD_LIBRARY_PATH": "$DEVBOX_PACKAGES_DIR/lib"
+    "LD_LIBRARY_PATH": "$DEVBOX_PACKAGES_DIR/lib"
   },
   "shell": {
     "init_hook": [
