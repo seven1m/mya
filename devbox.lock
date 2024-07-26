@@ -1,0 +1,166 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "llvmPackages_18.libllvm@latest": {
+      "last_modified": "2024-07-07T16:08:25Z",
+      "resolved": "github:NixOS/nixpkgs/ab82a9612aa45284d4adf69ee81871a389669a9e#llvmPackages_18.libllvm",
+      "source": "devbox-search",
+      "version": "18.1.8",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/fadxiq7xp7fgawc91ivkbzz0illrjdrk-llvm-18.1.8",
+              "default": true
+            },
+            {
+              "name": "dev",
+              "path": "/nix/store/lc6cg7nqvpjjivnxp49c3c6i3rdk40ns-llvm-18.1.8-dev"
+            },
+            {
+              "name": "lib",
+              "path": "/nix/store/cwishkdfydw04lxf0gbx2i55m10vqnfk-llvm-18.1.8-lib"
+            },
+            {
+              "name": "python",
+              "path": "/nix/store/mvad6pw7yzrc5chvpr2kp5qbwqffyn7n-llvm-18.1.8-python"
+            }
+          ],
+          "store_path": "/nix/store/fadxiq7xp7fgawc91ivkbzz0illrjdrk-llvm-18.1.8"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/3iq0alf4hfvgjpv726ydbxwj3bkzagm9-llvm-18.1.8",
+              "default": true
+            },
+            {
+              "name": "python",
+              "path": "/nix/store/0f17as28bmg4xjrr7dc3zjn943ckwbkc-llvm-18.1.8-python"
+            },
+            {
+              "name": "dev",
+              "path": "/nix/store/vqpxjd9yvasna8wi9zhb65vb580w7dgb-llvm-18.1.8-dev"
+            },
+            {
+              "name": "lib",
+              "path": "/nix/store/8y9x00lgz83f9s2fn0l07xpp9q7gxa64-llvm-18.1.8-lib"
+            }
+          ],
+          "store_path": "/nix/store/3iq0alf4hfvgjpv726ydbxwj3bkzagm9-llvm-18.1.8"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/s0nfnzbdc2s681m1ll4a23xc4v5w4a7c-llvm-18.1.8",
+              "default": true
+            },
+            {
+              "name": "python",
+              "path": "/nix/store/p3z1df0flwlpfjh532ssi6069c244h8f-llvm-18.1.8-python"
+            },
+            {
+              "name": "dev",
+              "path": "/nix/store/42nr7l94ryylvg1y0vzb43x526x8zzz8-llvm-18.1.8-dev"
+            },
+            {
+              "name": "lib",
+              "path": "/nix/store/43wdpw9nws5jl985r6rdfgdwy30rv6vx-llvm-18.1.8-lib"
+            }
+          ],
+          "store_path": "/nix/store/s0nfnzbdc2s681m1ll4a23xc4v5w4a7c-llvm-18.1.8"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/16cm18xwbw4rs123hq5wjk3dvwa40vcf-llvm-18.1.8",
+              "default": true
+            },
+            {
+              "name": "dev",
+              "path": "/nix/store/wijipxmz3lnwbcwrwl5r34mw20qlqwi1-llvm-18.1.8-dev"
+            },
+            {
+              "name": "lib",
+              "path": "/nix/store/fr74q0nf9wlkfmf1qqmsklykmc09sic6-llvm-18.1.8-lib"
+            },
+            {
+              "name": "python",
+              "path": "/nix/store/prajkhjryw40nw6ikfrm60hypidn1f9q-llvm-18.1.8-python"
+            }
+          ],
+          "store_path": "/nix/store/16cm18xwbw4rs123hq5wjk3dvwa40vcf-llvm-18.1.8"
+        }
+      }
+    },
+    "ruby_3_3@latest": {
+      "last_modified": "2024-07-07T07:43:47Z",
+      "plugin_version": "0.0.2",
+      "resolved": "github:NixOS/nixpkgs/b60793b86201040d9dee019a05089a9150d08b5b#ruby_3_3",
+      "source": "devbox-search",
+      "version": "3.3.2",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/qfaw55crdlvajfkpmybjfq4cfmbmm86r-ruby-3.3.2",
+              "default": true
+            },
+            {
+              "name": "devdoc",
+              "path": "/nix/store/vsda7rk49jvwcpjzlxdw13yibvdgjhqd-ruby-3.3.2-devdoc"
+            }
+          ],
+          "store_path": "/nix/store/qfaw55crdlvajfkpmybjfq4cfmbmm86r-ruby-3.3.2"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/q4jhbigza58sb5bbsygirw3g8ffx567g-ruby-3.3.2",
+              "default": true
+            },
+            {
+              "name": "devdoc",
+              "path": "/nix/store/532fwakiad4xajmmgrjqmvyn1r90n1a0-ruby-3.3.2-devdoc"
+            }
+          ],
+          "store_path": "/nix/store/q4jhbigza58sb5bbsygirw3g8ffx567g-ruby-3.3.2"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5vhq60d1wylzfj47m9lx788zgx95dl8h-ruby-3.3.2",
+              "default": true
+            },
+            {
+              "name": "devdoc",
+              "path": "/nix/store/czvcsmhn6nf9j7mwlj2g94cqk3sldayv-ruby-3.3.2-devdoc"
+            }
+          ],
+          "store_path": "/nix/store/5vhq60d1wylzfj47m9lx788zgx95dl8h-ruby-3.3.2"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/mlmfwq1bxcbnww5szh5c1kmlzq13pqbr-ruby-3.3.2",
+              "default": true
+            },
+            {
+              "name": "devdoc",
+              "path": "/nix/store/6bnh1i13ggkwly1kahmv7mfmi0gywx64-ruby-3.3.2-devdoc"
+            }
+          ],
+          "store_path": "/nix/store/mlmfwq1bxcbnww5szh5c1kmlzq13pqbr-ruby-3.3.2"
+        }
+      }
+    }
+  }
+}
