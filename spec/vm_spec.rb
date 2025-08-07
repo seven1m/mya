@@ -8,7 +8,7 @@ describe VM do
   end
 
   it "evaluates integers" do
-    expect(execute("1")).must_equal(1)
+    expect(execute("123")).must_equal(123)
   end
 
   it "evaluates strings" do
@@ -28,16 +28,16 @@ describe VM do
     code = <<~CODE
       class Foo
         def bar
-          @bar = 1
+          @bar = 10
         end
       end
       Foo.new.bar
     CODE
-    expect(execute(code)).must_equal(1)
+    expect(execute(code)).must_equal(10)
   end
 
   it "evaluates variables set and get" do
-    expect(execute("a = 1; a")).must_equal(1)
+    expect(execute("a = 1; a + a")).must_equal(2)
   end
 
   it "evaluates arrays" do
@@ -152,11 +152,34 @@ describe VM do
 
   it "evaluates operator expressions" do
     expect(execute("1 + 2")).must_equal 3
+    expect(execute("3 - 1")).must_equal 2
+    expect(execute("2 * 3")).must_equal 6
+    expect(execute("6 / 2")).must_equal 3
     expect(execute("3 == 3")).must_equal true
     expect(execute("3 == 4")).must_equal false
   end
 
-  it "evaluates if expressions" do
+  it "evaluates simple if expressions" do
+    code = <<~CODE
+      if true
+        3
+      else
+        4
+      end
+    CODE
+    expect(execute(code)).must_equal(3)
+
+    code = <<~CODE
+      if false
+        3
+      else
+        4
+      end
+    CODE
+    expect(execute(code)).must_equal(4)
+  end
+
+  it "evaluates nested if expressions" do
     code = <<~CODE
       if false
         if true
@@ -211,23 +234,24 @@ describe VM do
     expect(execute(code)).must_equal(5)
   end
 
+  def execute_code(code)
+    io = StringIO.new
+    execute(code, io:)
+    io.rewind
+    io.read
+  end
+
   it "evaluates puts for both int and str" do
     code = <<~CODE
       puts(123)
       puts("foo")
     CODE
-    io = StringIO.new
-    execute(code, io:)
-    io.rewind
-    expect(io.read).must_equal("123\nfoo\n")
+    out = execute_code(code)
+    expect(out).must_equal("123\nfoo\n")
   end
 
   def execute_file(path)
-    code = File.read(path)
-    io = StringIO.new
-    execute(code, io:)
-    io.rewind
-    io.read
+    execute_code(File.read(path))
   end
 
   it "evaluates nillable strings" do
