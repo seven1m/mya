@@ -20,11 +20,11 @@ class Compiler
           return @fn_rc_set_str if @fn_rc_set_str
 
           @fn_rc_set_str =
-            @module.functions["rc_set_str"] ||
+            @module.functions['rc_set_str'] ||
               @module.functions.add(
-                "rc_set_str",
+                'rc_set_str',
                 [pointer_type, LLVM::Type.pointer(LLVM::UInt8), LLVM::UInt32],
-                LLVM::Type.void
+                LLVM::Type.void,
               )
         end
       end

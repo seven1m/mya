@@ -11,7 +11,7 @@ class Compiler
           store_ptr(ary_ptr)
 
           elements.each_with_index do |element, index|
-            gep = builder.gep2(LLVM::Type.array(element_type), ary_ptr, [LLVM.Int(0), LLVM.Int(index)], "")
+            gep = builder.gep2(LLVM::Type.array(element_type), ary_ptr, [LLVM.Int(0), LLVM.Int(index)], '')
             builder.store(element, gep)
           end
 

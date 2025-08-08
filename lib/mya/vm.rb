@@ -27,7 +27,7 @@ class VM
     end
   end
 
-  MainClass = ClassType.new("main")
+  MainClass = ClassType.new('main')
   MainObject = ObjectType.new(MainClass)
 
   def initialize(instructions, io: $stdout)
@@ -65,7 +65,7 @@ class VM
     puts: ->(arg, io:) do
       io.puts(arg)
       arg.to_s.size
-    end
+    end,
   }.freeze
 
   def execute(instruction)
@@ -85,7 +85,7 @@ class VM
   def execute_call(instruction)
     new_args = @stack.pop(instruction.arg_count)
 
-    receiver = @stack.pop or raise(ArgumentError, "No receiver")
+    receiver = @stack.pop or raise(ArgumentError, 'No receiver')
     name = instruction.name
     if receiver.respond_to?(name)
       @stack << receiver.send(name, *new_args)

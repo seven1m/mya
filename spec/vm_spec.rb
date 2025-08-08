@@ -1,6 +1,6 @@
-require_relative "spec_helper"
-require_relative "support/shared_backend_examples"
-require "stringio"
+require_relative 'spec_helper'
+require_relative 'support/shared_backend_examples'
+require 'stringio'
 
 describe VM do
   include SharedBackendExamples

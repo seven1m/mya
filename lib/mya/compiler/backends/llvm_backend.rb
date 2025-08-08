@@ -1,15 +1,15 @@
-require "llvm/core"
-require "llvm/execution_engine"
-require "llvm/linker"
-require_relative "llvm_backend/rc_builder"
-require_relative "llvm_backend/array_builder"
-require_relative "llvm_backend/object_builder"
-require_relative "llvm_backend/string_builder"
+require 'llvm/core'
+require 'llvm/execution_engine'
+require 'llvm/linker'
+require_relative 'llvm_backend/rc_builder'
+require_relative 'llvm_backend/array_builder'
+require_relative 'llvm_backend/object_builder'
+require_relative 'llvm_backend/string_builder'
 
 class Compiler
   module Backends
     class LLVMBackend
-      LIB_PATH = File.expand_path("../../../../build/lib.ll", __dir__)
+      LIB_PATH = File.expand_path('../../../../build/lib.ll', __dir__)
 
       def initialize(instructions, dump: false)
         @instructions = instructions
@@ -49,9 +49,9 @@ class Compiler
       end
 
       def build_module
-        @module = LLVM::Module.new("llvm")
+        @module = LLVM::Module.new('llvm')
         @return_type = @instructions.last.type!
-        @entry = @module.functions.add("main", [], llvm_type(@return_type))
+        @entry = @module.functions.add('main', [], llvm_type(@return_type))
         build_function(@entry, @instructions)
         @lib.link_into(@module)
         #@module.dump if @dump || !@module.valid?
@@ -61,7 +61,7 @@ class Compiler
       def build_function(function, instructions)
         function.basic_blocks.append.build do |builder|
           unused_for_now = LLVM::Int # need at least one struct member
-          main_obj_struct = LLVM.Struct(unused_for_now, "main")
+          main_obj_struct = LLVM.Struct(unused_for_now, 'main')
           @main_obj = ObjectBuilder.new(builder:, mod: @module, struct: main_obj_struct).to_ptr
           @scope_stack << { function:, vars: {}, self_obj: @main_obj }
           build_instructions(function, builder, instructions) { |return_value| builder.ret return_value }
@@ -226,7 +226,7 @@ class Compiler
           ptr = read_rc_pointer(value)
           read_llvm_type_as_ruby(ptr, type)
         else
-          raise "Unknown type: #{type.inspect}" unless type.name == "nillable"
+          raise "Unknown type: #{type.inspect}" unless type.name == 'nillable'
           if (ptr = read_rc_pointer(value, nillable: true))
             read_llvm_type_as_ruby(ptr, type.types.first)
           end
@@ -272,11 +272,11 @@ class Compiler
       end
 
       def fn_puts_int
-        @fn_puts_int ||= @module.functions.add("puts_int", [LLVM::Int32], LLVM::Int32)
+        @fn_puts_int ||= @module.functions.add('puts_int', [LLVM::Int32], LLVM::Int32)
       end
 
       def fn_puts_str
-        @fn_puts_str ||= @module.functions.add("puts_str", [RcBuilder.pointer_type], LLVM::Int32)
+        @fn_puts_str ||= @module.functions.add('puts_str', [RcBuilder.pointer_type], LLVM::Int32)
       end
 
       def build_methods
@@ -292,20 +292,20 @@ class Compiler
               array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
               array.last
             end,
-            "<<": ->(builder:, args:, **) do
+            '<<': ->(builder:, args:, **) do
               element_type = args.last.type
               array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
               array.push(args.last)
-            end
+            end,
           },
           int: {
-            "+": ->(builder:, args:, **) { builder.add(*args) },
-            "-": ->(builder:, args:, **) { builder.sub(*args) },
-            "*": ->(builder:, args:, **) { builder.mul(*args) },
-            "/": ->(builder:, args:, **) { builder.sdiv(*args) },
-            "==": ->(builder:, args:, **) { builder.icmp(:eq, *args) }
+            '+': ->(builder:, args:, **) { builder.add(*args) },
+            '-': ->(builder:, args:, **) { builder.sub(*args) },
+            '*': ->(builder:, args:, **) { builder.mul(*args) },
+            '/': ->(builder:, args:, **) { builder.sdiv(*args) },
+            '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
           },
-          "(object main)": {
+          '(object main)': {
             puts: ->(builder:, args:, instruction:) do
               arg = args[1] # receiver is arg 0
               arg_type = instruction.type!.types[1].to_sym
@@ -317,8 +317,8 @@ class Compiler
               else
                 raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
               end
-            end
-          }
+            end,
+          },
         }
       end
 
@@ -330,8 +330,8 @@ class Compiler
       # usage:
       # diff(@module.functions[11].to_s, @module.functions[0].to_s)
       def diff(expected, actual)
-        File.write("/tmp/actual.ll", actual)
-        File.write("/tmp/expected.ll", expected)
+        File.write('/tmp/actual.ll', actual)
+        File.write('/tmp/expected.ll', expected)
         puts `diff -y -W 134 /tmp/expected.ll /tmp/actual.ll`
       end
     end

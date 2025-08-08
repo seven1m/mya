@@ -20,7 +20,7 @@ class Compiler
     end
 
     def inspect
-      "<#{self.class.name} #{instance_variables.map { |iv| "#{iv}=#{instance_variable_get(iv).inspect}" }.join(" ")}>"
+      "<#{self.class.name} #{instance_variables.map { |iv| "#{iv}=#{instance_variable_get(iv).inspect}" }.join(' ')}>"
     end
 
     def to_h

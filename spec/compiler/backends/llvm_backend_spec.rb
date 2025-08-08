@@ -1,6 +1,6 @@
-require_relative "../../spec_helper"
-require_relative "../../support/shared_backend_examples"
-require "tempfile"
+require_relative '../../spec_helper'
+require_relative '../../support/shared_backend_examples'
+require 'tempfile'
 
 describe Compiler::Backends::LLVMBackend do
   include SharedBackendExamples
@@ -11,7 +11,7 @@ describe Compiler::Backends::LLVMBackend do
   end
 
   def execute_with_output(code)
-    temp = Tempfile.create("compiled.ll")
+    temp = Tempfile.create('compiled.ll')
     temp.close
     instructions = Compiler.new(code).compile
     Compiler::Backends::LLVMBackend.new(instructions).dump_ir_to_file(temp.path)
@@ -29,7 +29,7 @@ describe Compiler::Backends::LLVMBackend do
   def lli
     return @lli if @lli
 
-    major_version = LLVM::RUBY_LLVM_VERSION.split(".").first
-    @lli = (system("command -v lli-#{major_version} 2>/dev/null >/dev/null") ? "lli-#{major_version}" : "lli")
+    major_version = LLVM::RUBY_LLVM_VERSION.split('.').first
+    @lli = (system("command -v lli-#{major_version} 2>/dev/null >/dev/null") ? "lli-#{major_version}" : 'lli')
   end
 end

@@ -40,11 +40,11 @@ class Compiler
         end
 
         def field(index)
-          @builder.struct_gep2(type, @ptr, index, "")
+          @builder.struct_gep2(type, @ptr, index, '')
         end
 
         def self.type
-          @type ||= LLVM.Struct(LLVM::Type.ptr, LLVM::UInt64, LLVM::UInt64, "rc")
+          @type ||= LLVM.Struct(LLVM::Type.ptr, LLVM::UInt64, LLVM::UInt64, 'rc')
         end
 
         def self.pointer_type
@@ -52,17 +52,17 @@ class Compiler
         end
 
         def self.simple_name
-          name.split("::").last.sub(/Builder$/, "").downcase
+          name.split('::').last.sub(/Builder$/, '').downcase
         end
 
         private
 
         def fn_rc_take
-          @fn_rc_take ||= @module.functions.add("rc_take", [pointer_type], LLVM::Type.void)
+          @fn_rc_take ||= @module.functions.add('rc_take', [pointer_type], LLVM::Type.void)
         end
 
         def fn_rc_drop
-          @fn_rc_drop ||= @module.functions.add("rc_drop", [pointer_type], LLVM::Type.void)
+          @fn_rc_drop ||= @module.functions.add('rc_drop', [pointer_type], LLVM::Type.void)
         end
       end
     end

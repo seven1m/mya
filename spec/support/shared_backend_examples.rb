@@ -1,24 +1,24 @@
 module SharedBackendExamples
   def self.included(base)
     base.class_eval do
-      it "evaluates integers" do
-        expect(execute("123")).must_equal(123)
+      it 'evaluates integers' do
+        expect(execute('123')).must_equal(123)
       end
 
-      it "evaluates strings" do
-        expect(execute('"foo"')).must_equal("foo")
+      it 'evaluates strings' do
+        expect(execute('"foo"')).must_equal('foo')
       end
 
-      it "evaluates nil" do
-        expect(execute("nil")).must_be_nil
+      it 'evaluates nil' do
+        expect(execute('nil')).must_be_nil
       end
 
-      it "evaluates booleans" do
-        expect(execute("true")).must_equal(true)
-        expect(execute("false")).must_equal(false)
+      it 'evaluates booleans' do
+        expect(execute('true')).must_equal(true)
+        expect(execute('false')).must_equal(false)
       end
 
-      it "evaluates classes" do
+      it 'evaluates classes' do
         code = <<~CODE
           class Foo
             def bar
@@ -30,11 +30,11 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(10)
       end
 
-      it "evaluates variables set and get" do
-        expect(execute("a = 1; a + a")).must_equal(2)
+      it 'evaluates variables set and get' do
+        expect(execute('a = 1; a + a')).must_equal(2)
       end
 
-      it "evaluates arrays" do
+      it 'evaluates arrays' do
         code = <<~CODE
           a = [1, 2, 3]
           a.first
@@ -61,25 +61,25 @@ module SharedBackendExamples
           a << "bar"
           a.last
         CODE
-        expect(execute(code)).must_equal("bar")
+        expect(execute(code)).must_equal('bar')
 
         code = <<~CODE
           a = ["foo", "bar", "baz"]
           a.first
         CODE
-        expect(execute(code)).must_equal("foo")
+        expect(execute(code)).must_equal('foo')
 
         code = <<~CODE
           a = ["foo", "bar", "baz"]
           a.last
         CODE
-        expect(execute(code)).must_equal("baz")
+        expect(execute(code)).must_equal('baz')
 
         code = <<~CODE
           a = [nil, "foo", "bar"]
           a.last
         CODE
-        expect(execute(code)).must_equal("bar")
+        expect(execute(code)).must_equal('bar')
 
         code = <<~CODE
           a = ["foo", "bar", nil]
@@ -96,7 +96,7 @@ module SharedBackendExamples
         expect(execute(code)).must_be_nil
       end
 
-      it "evaluates method definitions" do
+      it 'evaluates method definitions' do
         code = <<~CODE
           def foo
             'foo'
@@ -104,10 +104,10 @@ module SharedBackendExamples
 
           foo
         CODE
-        expect(execute(code)).must_equal("foo")
+        expect(execute(code)).must_equal('foo')
       end
 
-      it "evaluates method definitions with arguments" do
+      it 'evaluates method definitions with arguments' do
         code = <<~CODE
           def bar(x)
             x
@@ -122,7 +122,7 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(90)
       end
 
-      it "does not stomp on method arguments" do
+      it 'does not stomp on method arguments' do
         code = <<~CODE
           def bar(b)
             b
@@ -138,16 +138,16 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(100)
       end
 
-      it "evaluates operator expressions" do
-        expect(execute("1 + 2")).must_equal 3
-        expect(execute("3 - 1")).must_equal 2
-        expect(execute("2 * 3")).must_equal 6
-        expect(execute("6 / 2")).must_equal 3
-        expect(execute("3 == 3")).must_equal true
-        expect(execute("3 == 4")).must_equal false
+      it 'evaluates operator expressions' do
+        expect(execute('1 + 2')).must_equal 3
+        expect(execute('3 - 1')).must_equal 2
+        expect(execute('2 * 3')).must_equal 6
+        expect(execute('6 / 2')).must_equal 3
+        expect(execute('3 == 3')).must_equal true
+        expect(execute('3 == 4')).must_equal false
       end
 
-      it "evaluates simple if expressions" do
+      it 'evaluates simple if expressions' do
         code = <<~CODE
           if true
             3
@@ -167,7 +167,7 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(4)
       end
 
-      it "evaluates nested if expressions" do
+      it 'evaluates nested if expressions' do
         code = <<~CODE
           if false
             if true
@@ -222,7 +222,7 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(5)
       end
 
-      it "evaluates puts for both int and str" do
+      it 'evaluates puts for both int and str' do
         code = <<~CODE
           puts(123)
           puts("foo")
@@ -231,7 +231,7 @@ module SharedBackendExamples
         expect(out).must_equal("123\nfoo\n")
       end
 
-      it "evaluates nillable strings" do
+      it 'evaluates nillable strings' do
         code = <<~CODE
           a = "foo" # a:nillable
           a = nil
@@ -244,16 +244,16 @@ module SharedBackendExamples
           a = "foo"
           a
         CODE
-        expect(execute(code)).must_equal("foo")
+        expect(execute(code)).must_equal('foo')
       end
 
-      it "evaluates examples/fib.rb" do
-        result = execute_file(File.expand_path("../../examples/fib.rb", __dir__))
+      it 'evaluates examples/fib.rb' do
+        result = execute_file(File.expand_path('../../examples/fib.rb', __dir__))
         expect(result).must_equal("55\n")
       end
 
-      it "evaluates examples/fact.rb" do
-        result = execute_file(File.expand_path("../../examples/fact.rb", __dir__))
+      it 'evaluates examples/fact.rb' do
+        result = execute_file(File.expand_path('../../examples/fact.rb', __dir__))
         expect(result).must_equal("3628800\n")
       end
     end
