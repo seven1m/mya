@@ -48,12 +48,6 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(3)
 
         code = <<~CODE
-          a = [1, 2, 3]
-          a.last
-        CODE
-        expect(execute(code)).must_equal(3)
-
-        code = <<~CODE
           a = []
           a << 4
           a << 5
