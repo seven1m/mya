@@ -588,7 +588,7 @@ class Compiler
       array = AryType.new(array_type)
       {
         '(object main)': {
-          puts: MethodType.new(MainObject, UnionType.new(IntType, StrType), IntType),
+          puts: MethodType.new(MainObject, UnionType.new(IntType, StrType, BoolType), IntType),
         },
         int: {
           zero?: MethodType.new(IntType, BoolType),

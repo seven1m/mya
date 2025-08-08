@@ -82,3 +82,7 @@ int32_t puts_str(const RC *rc) {
     const char *str = rc->ptr;
     return printf("%s\n", str);
 }
+
+int32_t puts_bool(int8_t b) {
+    return printf("%s\n", b ? "true" : "false");
+}

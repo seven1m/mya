@@ -279,6 +279,10 @@ class Compiler
         @fn_puts_str ||= @module.functions.add('puts_str', [RcBuilder.pointer_type], LLVM::Int32)
       end
 
+      def fn_puts_bool
+        @fn_puts_bool ||= @module.functions.add('puts_bool', [LLVM::Int1], LLVM::Int32)
+      end
+
       def build_methods
         {
           array: {
@@ -304,6 +308,7 @@ class Compiler
             '*': ->(builder:, args:, **) { builder.mul(*args) },
             '/': ->(builder:, args:, **) { builder.sdiv(*args) },
             '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
+            '<': ->(builder:, args:, **) { builder.icmp(:slt, *args) },
           },
           '(object main)': {
             puts: ->(builder:, args:, instruction:) do
@@ -314,6 +319,8 @@ class Compiler
                 builder.call(fn_puts_int, arg)
               when :str
                 builder.call(fn_puts_str, arg)
+              when :bool
+                builder.call(fn_puts_bool, arg)
               else
                 raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
               end
