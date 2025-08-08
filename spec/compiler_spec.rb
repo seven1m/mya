@@ -630,4 +630,71 @@ describe Compiler do
                              { type: '([(object main), int] -> int)', instruction: :call, name: :puts, arg_count: 1 },
                            ]
   end
+
+  it 'compiles methods returning boolean values used with puts' do
+    code = <<~CODE
+      def is_equal(a, b)
+        a == b
+      end
+
+      puts(is_equal(1, 2))
+      puts(is_equal(3, 3))
+    CODE
+
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: '([(object main), int, int] -> (int | str | bool))',
+                               instruction: :def,
+                               name: :is_equal,
+                               params: %i[a b],
+                               body: [
+                                 { type: 'int', instruction: :push_arg, index: 0 },
+                                 { type: 'int', instruction: :set_var, name: :a, nillable: false },
+                                 { type: 'int', instruction: :push_arg, index: 1 },
+                                 { type: 'int', instruction: :set_var, name: :b, nillable: false },
+                                 { type: 'int', instruction: :push_var, name: :a },
+                                 { type: 'int', instruction: :push_var, name: :b },
+                                 {
+                                   type: '([int, int] -> (int | str | bool))',
+                                   instruction: :call,
+                                   name: :==,
+                                   arg_count: 1,
+                                 },
+                               ],
+                             },
+                             { type: '(object main)', instruction: :push_self },
+                             { type: '(object main)', instruction: :push_self },
+                             { type: 'int', instruction: :push_int, value: 1 },
+                             { type: 'int', instruction: :push_int, value: 2 },
+                             {
+                               type: '([(object main), int, int] -> (int | str | bool))',
+                               instruction: :call,
+                               name: :is_equal,
+                               arg_count: 2,
+                             },
+                             {
+                               type: '([(object main), (int | str | bool)] -> int)',
+                               instruction: :call,
+                               name: :puts,
+                               arg_count: 1,
+                             },
+                             { type: 'nil', instruction: :pop },
+                             { type: '(object main)', instruction: :push_self },
+                             { type: '(object main)', instruction: :push_self },
+                             { type: 'int', instruction: :push_int, value: 3 },
+                             { type: 'int', instruction: :push_int, value: 3 },
+                             {
+                               type: '([(object main), int, int] -> (int | str | bool))',
+                               instruction: :call,
+                               name: :is_equal,
+                               arg_count: 2,
+                             },
+                             {
+                               type: '([(object main), (int | str | bool)] -> int)',
+                               instruction: :call,
+                               name: :puts,
+                               arg_count: 1,
+                             },
+                           ]
+  end
 end

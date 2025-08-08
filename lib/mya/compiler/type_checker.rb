@@ -495,7 +495,12 @@ class Compiler
         when NillableType
           unify_nillable_type(a, b, instruction)
         else
-          unify_type_operator_with_type_operator(a, b, instruction)
+          case b
+          when UnionType
+            unify_union_type(b, a, instruction)
+          else
+            unify_type_operator_with_type_operator(a, b, instruction)
+          end
         end
       else
         raise "Unknown type: #{b.inspect}"
@@ -515,6 +520,12 @@ class Compiler
     end
 
     def unify_union_type(a, b, instruction)
+      # If both are union types, check if they're the same
+      if b.is_a?(UnionType)
+        return if a.types.sort_by(&:name) == b.types.sort_by(&:name)
+        raise_type_clash_error(a, b, instruction)
+      end
+
       unless (selected = a.select_type(b))
         raise_type_clash_error(a, b, instruction)
       end
