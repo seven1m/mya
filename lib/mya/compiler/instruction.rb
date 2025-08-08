@@ -192,6 +192,16 @@ class Compiler
     end
   end
 
+  class WhileInstruction < Instruction
+    attr_accessor :condition, :body
+
+    def instruction_name = :while
+
+    def to_h
+      super.merge(condition: condition.map(&:to_h), body: body.map(&:to_h))
+    end
+  end
+
   class DefInstruction < Instruction
     def initialize(name, line:)
       super(line:)

@@ -174,6 +174,21 @@ class Compiler
     @instructions << instruction
   end
 
+  def transform_while_node(node, used:)
+    instruction = WhileInstruction.new(line: node.location.start_line)
+
+    # Transform condition
+    instruction.condition = []
+    with_instructions_array(instruction.condition) { transform(node.predicate, used: true) }
+
+    # Transform body - the result is not used since while always returns nil
+    instruction.body = []
+    with_instructions_array(instruction.body) { transform(node.statements, used: false) }
+
+    @instructions << instruction
+    @instructions << PopInstruction.new unless used
+  end
+
   def with_instructions_array(array)
     array_was = @instructions
     @instructions = array

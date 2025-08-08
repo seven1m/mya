@@ -44,6 +44,10 @@ class Compiler
 
     def name_for_method_lookup = name.to_sym
 
+    def ==(other)
+      name == other.name && types == other.types
+    end
+
     def to_s
       case types.size
       when 0
@@ -318,6 +322,20 @@ class Compiler
       instruction.type = type_of_then
     end
 
+    def analyze_while(instruction)
+      condition_type = analyze_instruction(instruction.condition)
+      body_type = analyze_instruction(instruction.body)
+
+      # Check that condition evaluates to boolean after type inference
+      pruned_condition_type = condition_type.prune
+      unless pruned_condition_type == BoolType
+        raise TypeClash, "while condition must be bool, got #{pruned_condition_type}"
+      end
+
+      # While loops always return nil, regardless of body type
+      instruction.type = NilType
+    end
+
     def analyze_pop(instruction)
       instruction.type = NilType
     end
@@ -576,6 +594,7 @@ class Compiler
           zero?: MethodType.new(IntType, BoolType),
           '+': MethodType.new(IntType, IntType, IntType),
           '==': MethodType.new(IntType, IntType, BoolType),
+          '<': MethodType.new(IntType, IntType, BoolType),
           '-': MethodType.new(IntType, IntType, IntType),
           '*': MethodType.new(IntType, IntType, IntType),
           '/': MethodType.new(IntType, IntType, IntType),
