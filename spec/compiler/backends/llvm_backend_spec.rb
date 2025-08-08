@@ -10,7 +10,7 @@ describe Compiler::Backends::LLVMBackend do
     Compiler::Backends::LLVMBackend.new(instructions).run
   end
 
-  def execute_code(code)
+  def execute_with_output(code)
     temp = Tempfile.create("compiled.ll")
     temp.close
     instructions = Compiler.new(code).compile
@@ -21,7 +21,7 @@ describe Compiler::Backends::LLVMBackend do
   end
 
   def execute_file(path)
-    execute_code(File.read(path))
+    execute_with_output(File.read(path))
   end
 
   private

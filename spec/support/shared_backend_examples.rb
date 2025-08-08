@@ -227,7 +227,7 @@ module SharedBackendExamples
           puts(123)
           puts("foo")
         CODE
-        out = execute_code(code)
+        out = execute_with_output(code)
         expect(out).must_equal("123\nfoo\n")
       end
 

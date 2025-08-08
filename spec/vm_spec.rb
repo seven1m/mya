@@ -10,7 +10,7 @@ describe VM do
     VM.new(instructions, io:).run
   end
 
-  def execute_code(code)
+  def execute_with_output(code)
     io = StringIO.new
     execute(code, io:)
     io.rewind
@@ -18,6 +18,6 @@ describe VM do
   end
 
   def execute_file(path)
-    execute_code(File.read(path))
+    execute_with_output(File.read(path))
   end
 end
