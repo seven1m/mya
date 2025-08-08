@@ -352,7 +352,7 @@ describe Compiler do
     expect(e.message).must_equal 'one branch of `if` has type int and the other has type str'
   end
 
-  it "compiles while expressions" do
+  it 'compiles while expressions' do
     code = <<~CODE
       i = 0
       while i < 5
@@ -360,27 +360,27 @@ describe Compiler do
       end
     CODE
     expect(compile(code)).must_equal_with_diff [
-                             { type: "int", instruction: :push_int, value: 0 },
-                             { type: "int", instruction: :set_var, name: :i, nillable: false },
+                             { type: 'int', instruction: :push_int, value: 0 },
+                             { type: 'int', instruction: :set_var, name: :i, nillable: false },
                              {
-                               type: "nil",
+                               type: 'nil',
                                instruction: :while,
                                condition: [
-                                 { type: "int", instruction: :push_var, name: :i },
-                                 { type: "int", instruction: :push_int, value: 5 },
-                                 { type: "([int, int] -> bool)", instruction: :call, name: :<, arg_count: 1 }
+                                 { type: 'int', instruction: :push_var, name: :i },
+                                 { type: 'int', instruction: :push_int, value: 5 },
+                                 { type: '([int, int] -> bool)', instruction: :call, name: :<, arg_count: 1 },
                                ],
                                body: [
-                                 { type: "int", instruction: :push_var, name: :i },
-                                 { type: "int", instruction: :push_int, value: 1 },
-                                 { type: "([int, int] -> int)", instruction: :call, name: :+, arg_count: 1 },
-                                 { type: "int", instruction: :set_var, name: :i, nillable: false }
-                               ]
-                             }
+                                 { type: 'int', instruction: :push_var, name: :i },
+                                 { type: 'int', instruction: :push_int, value: 1 },
+                                 { type: '([int, int] -> int)', instruction: :call, name: :+, arg_count: 1 },
+                                 { type: 'int', instruction: :set_var, name: :i, nillable: false },
+                               ],
+                             },
                            ]
   end
 
-  it "compiles while expressions with different body types" do
+  it 'compiles while expressions with different body types' do
     code = <<~CODE
       i = 0
       result = 0
@@ -391,40 +391,40 @@ describe Compiler do
       end
     CODE
     expect(compile(code)).must_equal_with_diff [
-                             { type: "int", instruction: :push_int, value: 0 },
-                             { type: "int", instruction: :set_var, name: :i, nillable: false },
-                             { type: "int", instruction: :push_int, value: 0 },
-                             { type: "int", instruction: :set_var, name: :result, nillable: false },
+                             { type: 'int', instruction: :push_int, value: 0 },
+                             { type: 'int', instruction: :set_var, name: :i, nillable: false },
+                             { type: 'int', instruction: :push_int, value: 0 },
+                             { type: 'int', instruction: :set_var, name: :result, nillable: false },
                              {
-                               type: "nil",
+                               type: 'nil',
                                instruction: :while,
                                condition: [
-                                 { type: "int", instruction: :push_var, name: :i },
-                                 { type: "int", instruction: :push_int, value: 3 },
-                                 { type: "([int, int] -> bool)", instruction: :call, name: :<, arg_count: 1 }
+                                 { type: 'int', instruction: :push_var, name: :i },
+                                 { type: 'int', instruction: :push_int, value: 3 },
+                                 { type: '([int, int] -> bool)', instruction: :call, name: :<, arg_count: 1 },
                                ],
                                body: [
-                                 { type: "int", instruction: :push_var, name: :result },
-                                 { type: "int", instruction: :push_var, name: :i },
-                                 { type: "([int, int] -> int)", instruction: :call, name: :+, arg_count: 1 },
-                                 { type: "int", instruction: :set_var, name: :result, nillable: false },
-                                 { type: "int", instruction: :push_var, name: :i },
-                                 { type: "int", instruction: :push_int, value: 1 },
-                                 { type: "([int, int] -> int)", instruction: :call, name: :+, arg_count: 1 },
-                                 { type: "int", instruction: :set_var, name: :i, nillable: false }
-                               ]
-                             }
+                                 { type: 'int', instruction: :push_var, name: :result },
+                                 { type: 'int', instruction: :push_var, name: :i },
+                                 { type: '([int, int] -> int)', instruction: :call, name: :+, arg_count: 1 },
+                                 { type: 'int', instruction: :set_var, name: :result, nillable: false },
+                                 { type: 'int', instruction: :push_var, name: :i },
+                                 { type: 'int', instruction: :push_int, value: 1 },
+                                 { type: '([int, int] -> int)', instruction: :call, name: :+, arg_count: 1 },
+                                 { type: 'int', instruction: :set_var, name: :i, nillable: false },
+                               ],
+                             },
                            ]
   end
 
-  it "raises an error if while condition is not boolean" do
+  it 'raises an error if while condition is not boolean' do
     code = <<~CODE
       while "foo"
         1
       end
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal "while condition must be bool, got str"
+    expect(e.message).must_equal 'while condition must be bool, got str'
   end
 
   it 'compiles calls to puts for both int and str' do
