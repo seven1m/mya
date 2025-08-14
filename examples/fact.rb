@@ -6,4 +6,4 @@ def fact(n, result)
   end
 end
 
-puts fact(10, 1)
+puts fact(10, 1).to_s

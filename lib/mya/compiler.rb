@@ -62,7 +62,7 @@ class Compiler
     with_instructions_array(class_instructions) { transform(node.body, used: false) } if node.body
     instruction.body = class_instructions
     @instructions << instruction
-    @instructions << PushStrInstruction.new(instruction.name, line: node.location.start_line) if used
+    @instructions << PushConstInstruction.new(instruction.name, line: node.location.start_line) if used
   end
 
   def transform_constant_read_node(node, used:)
@@ -80,7 +80,7 @@ class Compiler
     params.each_with_index do |param, index|
       i1 = PushArgInstruction.new(index, line: node.location.start_line)
       def_instructions << i1
-      i2 = SetVarInstruction.new(param.name, nillable: false, line: node.location.start_line)
+      i2 = SetVarInstruction.new(param.name, line: node.location.start_line)
       def_instructions << i2
       instruction.params << param.name
     end
@@ -108,18 +108,27 @@ class Compiler
     instruction.if_true = []
     with_instructions_array(instruction.if_true) { transform(node.statements, used: true) }
     instruction.if_false = []
-    with_instructions_array(instruction.if_false) { transform(node.consequent, used: true) }
+    if node.consequent
+      with_instructions_array(instruction.if_false) { transform(node.consequent, used: true) }
+    else
+      # No else clause - push nil
+      with_instructions_array(instruction.if_false) { @instructions << PushNilInstruction.new }
+    end
     @instructions << instruction
     @instructions << PopInstruction.new unless used
   end
 
   def transform_instance_variable_write_node(node, used:)
     transform(node.value, used: true)
-    directives = @directives.dig(node.location.start_line, node.name) || []
-    nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
-    instruction = SetInstanceVarInstruction.new(node.name, nillable:, line: node.location.start_line)
+    instruction = SetInstanceVarInstruction.new(node.name, line: node.location.start_line)
     @instructions << instruction
     @instructions << PopInstruction.new unless used
+  end
+
+  def transform_instance_variable_read_node(node, used:)
+    return unless used
+    instruction = PushInstanceVarInstruction.new(node.name, line: node.location.start_line)
+    @instructions << instruction
   end
 
   def transform_integer_node(node, used:)
@@ -138,9 +147,7 @@ class Compiler
 
   def transform_local_variable_write_node(node, used:)
     transform(node.value, used: true)
-    directives = @directives.dig(node.location.start_line, node.name) || []
-    nillable = directives.include?(:nillable) || node.name.match?(/_or_nil$/)
-    instruction = SetVarInstruction.new(node.name, nillable:, line: node.location.start_line)
+    instruction = SetVarInstruction.new(node.name, line: node.location.start_line)
     @instructions << instruction
     @instructions << PushVarInstruction.new(node.name, line: node.location.start_line) if used
   end

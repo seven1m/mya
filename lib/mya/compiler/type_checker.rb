@@ -1,200 +1,8 @@
 class Compiler
-  class TypeVariable
-    def initialize(type_checker)
-      @type_checker = type_checker
-      @id = @type_checker.next_variable_id
-      @generic = true
-    end
-
-    attr_accessor :id, :instance
-
-    def name
-      @name ||= @type_checker.next_variable_name
-    end
-
-    def to_s = name.to_s
-
-    def to_sym = name.to_sym
-
-    def inspect = "TypeVariable(id = #{id})"
-
-    def generic? = @generic
-
-    def non_generic!
-      @generic = false
-      self
-    end
-
-    def prune
-      return self if @instance.nil?
-
-      @instance = @instance.prune
-      @instance.non_generic! unless generic?
-      @instance
-    end
-  end
-
-  class TypeOperator
-    def initialize(name, types)
-      @name = name
-      @types = types
-    end
-
-    attr_accessor :name, :types
-
-    def name_for_method_lookup = name.to_sym
-
-    def ==(other)
-      name == other.name && types == other.types
-    end
-
-    def to_s
-      case types.size
-      when 0
-        name.to_s
-      when 2
-        "(#{types[0]} #{name} #{types[1]})"
-      else
-        "#{name} #{types.join(' ')}"
-      end
-    end
-
-    def to_sym
-      to_s.to_sym
-    end
-
-    def inspect
-      "#<TypeOperator name=#{name} types=[#{types.join(', ')}]>"
-    end
-
-    def non_generic!
-      types.each(&:non_generic!)
-      self
-    end
-
-    def prune
-      dup.tap { |new_type| new_type.types = types.map(&:prune) }
-    end
-
-    def contains?(other_type)
-      raise 'expected TypeVariable' unless other_type.is_a?(TypeVariable)
-
-      types.any? do |candidate|
-        case candidate
-        when TypeVariable
-          candidate == other_type
-        when TypeOperator
-          candidate.contains?(other_type)
-        else
-          raise "Unexpected type: #{candidate.inspect}"
-        end
-      end
-    end
-
-    def evaluated_type = self
-  end
-
-  class MethodType < TypeOperator
-    def initialize(*types)
-      super('->', types)
-    end
-
-    def to_s
-      *arg_types, return_type = types
-      "([#{arg_types.join(', ')}] -> #{return_type})"
-    end
-
-    def inspect
-      "#<MethodType types=[#{types.map(&:inspect).join(', ')}]>"
-    end
-
-    def evaluated_type = types.last
-  end
-
-  # This just exists for debugging purposes.
-  # We could easily use MethodType, but would lose some context when puts debugging. :-)
-  class CallType < MethodType
-    def inspect
-      super.sub('MethodType', 'CallType')
-    end
-  end
-
-  class UnionType < TypeOperator
-    def initialize(*types)
-      super('union', types)
-    end
-
-    def to_s
-      "(#{types.join(' | ')})"
-    end
-
-    def select_type(other_type)
-      types.detect { |candidate| candidate.name == other_type.name && candidate.types.size == other_type.types.size }
-    end
-  end
-
-  class AryType < TypeOperator
-    def initialize(type)
-      super('array', [type])
-    end
-
-    def to_s
-      "(#{types[0]} array)"
-    end
-  end
-
-  class NillableType < TypeOperator
-    def initialize(type)
-      super('nillable', [type])
-    end
-
-    def to_s
-      "(nillable #{types[0]})"
-    end
-  end
-
-  class ClassType < TypeOperator
-    def initialize(class_name)
-      super(class_name.to_s, [])
-      @attributes = {}
-    end
-
-    def class_name = name
-    attr_reader :attributes
-
-    def to_s
-      attrs = attributes.map { |name, type| "#{name}:#{type}" }.join(', ')
-      "(class #{class_name} #{attrs})"
-    end
-
-    def inspect = "#<ClassType class_name=#{class_name.inspect} attributes=#{attributes.inspect}>"
-
-    def name_for_method_lookup = class_name.to_sym
-  end
-
-  class ObjectType < TypeOperator
-    def initialize(klass)
-      super('object', [klass])
-    end
-
-    def klass = types.first
-
-    def to_s = "(object #{klass.class_name})"
-
-    def inspect = "#<ObjectType klass=#{klass.inspect}>"
-
-    def name_for_method_lookup = to_s.to_sym
-  end
-
-  IntType = TypeOperator.new('int', [])
-  StrType = TypeOperator.new('str', [])
-  NilType = TypeOperator.new('nil', [])
-  BoolType = TypeOperator.new('bool', [])
-
   class TypeChecker
+    MAX_CONSTRAINT_ITERATIONS = 100
+
     class Error < StandardError
-    end
-    class RecursiveUnification < Error
     end
     class TypeClash < Error
     end
@@ -203,22 +11,328 @@ class Compiler
     class UndefinedVariable < Error
     end
 
-    MainClass = ClassType.new('main')
-    MainObject = ObjectType.new(MainClass)
+    class Type
+      private
+
+      def get_builtin_method_type(method_name, builtin_methods)
+        return nil unless builtin_methods
+
+        method_def = builtin_methods[method_name]
+        return nil unless method_def
+
+        if method_def.respond_to?(:call)
+          method_def.call(self)
+        else
+          method_def
+        end
+      end
+    end
+
+    class Constraint
+      def initialize(target, source, context: nil, context_data: {})
+        @target = target
+        @source = source
+        @context = context
+        @context_data = context_data
+      end
+
+      attr_reader :target, :source, :context, :context_data
+
+      def solve!
+        target_resolved = @target.resolve!
+        source_resolved = @source.resolve!
+
+        return false if target_resolved == source_resolved
+
+        if target_resolved.is_a?(TypeVariable)
+          target_resolved.instance = source_resolved
+          return true
+        elsif source_resolved.is_a?(TypeVariable)
+          # This constraint will be solved later when the source type is resolved
+          return false
+        elsif target_resolved.class != source_resolved.class ||
+              (target_resolved.respond_to?(:name) && target_resolved.name != source_resolved.name)
+          case @context
+          when :if_condition
+            raise TypeClash, "`if` condition must be Boolean, got #{source_resolved}"
+          when :while_condition
+            raise TypeClash, "`while` condition must be Boolean, got #{source_resolved}"
+          when :if_branches
+            raise TypeClash, "one branch of `if` has type #{target_resolved} and the other has type #{source_resolved}"
+          when :variable_reassignment
+            var_name = @context_data[:variable_name]
+            raise TypeClash,
+                  "the variable `#{var_name}` has type #{target_resolved} already; you cannot change it to type #{source_resolved}"
+          when :method_argument
+            method_name = @context_data[:method_name]
+            receiver_type = @context_data[:receiver_type]
+            arg_index = @context_data[:arg_index]
+            raise TypeClash,
+                  "#{receiver_type}##{method_name} argument #{arg_index} has type #{target_resolved}, but you passed #{source_resolved}"
+          else
+            raise TypeClash, "cannot constrain #{target_resolved} to #{source_resolved}"
+          end
+        end
+
+        return false
+      end
+    end
+
+    class TypeVariable < Type
+      def initialize(type_checker)
+        @type_checker = type_checker
+        @id = @type_checker.next_variable_id
+        @type_checker.register_type_variable(self)
+      end
+
+      attr_accessor :id, :instance
+
+      def name
+        @name ||= @type_checker.next_variable_name
+      end
+
+      def to_s = name.to_s
+
+      def to_sym = name.to_sym
+
+      def inspect = "TypeVariable(id = #{id}, name = #{name})"
+
+      def resolve!
+        return @instance.resolve! if @instance
+        self
+      end
+
+      def get_method_type(method_name)
+        resolved = resolve!
+        return nil if resolved == self
+        resolved.get_method_type(method_name)
+      end
+
+      def ==(other)
+        return true if equal?(other)
+        return @instance == other if @instance
+        false
+      end
+    end
+
+    class MethodCallConstraint < Constraint
+      def initialize(target:, receiver_type:, method_name:, arg_types:, type_checker:)
+        @target = target
+        @receiver_type = receiver_type
+        @method_name = method_name
+        @arg_types = arg_types
+        @type_checker = type_checker
+      end
+
+      attr_reader :target, :receiver_type, :method_name, :arg_types
+
+      def solve!
+        receiver_resolved = @receiver_type.resolve!
+
+        return false if receiver_resolved.is_a?(TypeVariable)
+
+        method_type = receiver_resolved.get_method_type(@method_name)
+        return false unless method_type
+
+        expected_count = method_type.param_types.length
+        actual_count = @arg_types.length
+        if actual_count != expected_count
+          raise ArgumentError,
+                "method #{@method_name} expects #{expected_count} argument#{'s' if expected_count != 1}, got #{actual_count}"
+        end
+
+        @arg_types.each_with_index do |arg_type, index|
+          constraint = Constraint.new(method_type.param_types[index], arg_type)
+          @type_checker.add_constraint(constraint)
+        end
+
+        target_resolved = @target.resolve!
+        return_resolved = method_type.return_type.resolve!
+
+        return false if target_resolved == return_resolved
+
+        if target_resolved.is_a?(TypeVariable)
+          target_resolved.instance = return_resolved
+          return true
+        elsif return_resolved.is_a?(TypeVariable)
+          return false
+        elsif target_resolved.class != return_resolved.class ||
+              (target_resolved.respond_to?(:name) && target_resolved.name != return_resolved.name)
+          raise TypeClash, "Cannot constrain #{target_resolved} to #{return_resolved}"
+        end
+
+        return false
+      end
+    end
+
+    class ConcreteType < Type
+      def initialize(name)
+        @name = name
+      end
+
+      attr_reader :name
+
+      def resolve! = self
+
+      def to_s = name
+    end
+
+    class ClassType < Type
+      def initialize(name)
+        @name = name
+        @methods = {}
+        @instance_variables = {}
+      end
+
+      attr_reader :name
+
+      def resolve! = self
+
+      def to_s = name
+
+      def get_method_type(method_name)
+        return @methods[method_name] if @methods[method_name]
+
+        get_builtin_method_type(method_name, BUILTIN_METHODS[name.to_sym])
+      end
+
+      def define_method_type(name, method_type)
+        @methods[name] = method_type
+      end
+
+      def get_instance_variable(name)
+        @instance_variables[name]
+      end
+
+      def define_instance_variable(name, variable_type)
+        @instance_variables[name] = variable_type
+      end
+
+      def resolve! = self
+    end
+
+    class MethodType < Type
+      def initialize(self_type:, param_types:, return_type:, name:)
+        @self_type = self_type
+        @param_types = param_types
+        @return_type = return_type
+        @name = name
+      end
+
+      attr_reader :self_type, :param_types, :return_type, :name
+
+      def resolve! = self
+
+      def to_s
+        resolved_params = param_types.map(&:resolve!)
+        resolved_return = return_type.resolve!
+        if resolved_params.empty?
+          "#{self_type}##{name}() => #{resolved_return}"
+        else
+          param_str = resolved_params.map(&:to_s).join(', ')
+          "#{self_type}##{name}(#{param_str}) => #{resolved_return}"
+        end
+      end
+    end
+
+    class ArrayType < Type
+      def initialize(element_type)
+        @element_type = element_type
+      end
+
+      attr_reader :element_type
+
+      def resolve! = self
+
+      def to_s = "Array[#{element_type.resolve!}]"
+
+      def name = :Array
+
+      def get_method_type(method_name)
+        get_builtin_method_type(method_name, BUILTIN_METHODS[:Array])
+      end
+
+      def ==(other)
+        return false unless other.is_a?(ArrayType)
+        element_type == other.element_type
+      end
+    end
+
+    IntType = ClassType.new('Integer')
+    StrType = ClassType.new('String')
+    BoolType = ClassType.new('Boolean')
+    NilType = ClassType.new('NilClass')
+
+    ObjectClass = ClassType.new('Object')
+
+    class Scope
+      def initialize(self_type:, method_params:, type_checker:)
+        @self_type = self_type
+        @variables = {}
+        @method_params = method_params
+        @type_checker = type_checker
+      end
+
+      attr_reader :self_type, :method_params
+
+      def set_var_type(name, type)
+        if (existing_type = @variables[name])
+          constraint =
+            Constraint.new(existing_type, type, context: :variable_reassignment, context_data: { variable_name: name })
+          constraint.solve!
+        else
+          @variables[name] = type
+        end
+      end
+
+      def get_var_type(name)
+        @variables[name]
+      end
+    end
 
     def initialize
       @stack = []
-      @scope_stack = [{ vars: {}, self_type: MainClass }]
+      @scope_stack = [Scope.new(self_type: ObjectClass, method_params: [], type_checker: self)]
       @classes = {}
-      @calls_to_unify = []
-      @methods = build_initial_methods
+      @type_variables = []
+      @constraints = []
     end
 
+    def scope = @scope_stack.last
+
     def analyze(instruction)
-      analyze_instruction(instruction).prune
-      @calls_to_unify.each do |call|
-        type_of_receiver = call.fetch(:type_of_receiver).prune
-        analyze_call_with_known_receiver(**call, type_of_receiver:)
+      analyze_instruction(instruction)
+      solve_constraints
+      check_unresolved_types
+    end
+
+    def add_constraint(constraint)
+      @constraints << constraint
+    end
+
+    def solve_constraints
+      iteration = 0
+
+      loop do
+        iteration += 1
+        if iteration > MAX_CONSTRAINT_ITERATIONS
+          raise Error, "Constraint solving did not converge after #{MAX_CONSTRAINT_ITERATIONS} iterations"
+        end
+
+        break unless @constraints.any?(&:solve!)
+      end
+    end
+
+    def register_type_variable(type_variable)
+      @type_variables << type_variable
+    end
+
+    def check_unresolved_types
+      @type_variables.each do |type_var|
+        resolved = type_var.resolve!
+        if resolved.is_a?(TypeVariable)
+          raise TypeError, "Not enough information to infer type of variable '#{type_var.name}'"
+        end
       end
     end
 
@@ -240,135 +354,132 @@ class Compiler
 
     private
 
-    def analyze_instruction(instruction)
-      return analyze_array_of_instructions(instruction) if instruction.is_a?(Array)
-
-      send("analyze_#{instruction.instruction_name}", instruction)
-    end
-
     def analyze_array_of_instructions(array)
-      array.map { |instruction| analyze_instruction(instruction) }.last
+      array.each { |instruction| analyze_instruction(instruction) }
+      @stack.last
     end
 
     def analyze_call(instruction)
-      type_of_args = pop(instruction.arg_count)
-      type_of_receiver = pop&.prune
-      type_of_return = TypeVariable.new(self)
-      type_of_call = CallType.new(type_of_receiver, *type_of_args, type_of_return)
+      arg_types = pop_arguments(instruction.arg_count)
+      receiver_type = @stack.pop
+      result_type = TypeVariable.new(self)
 
-      if type_of_receiver.is_a?(TypeVariable)
-        # We cannot unify yet, since we don't know the receiver type.
-        # Save this call for later unification.
-        @calls_to_unify << { type_of_receiver:, type_of_call:, instruction: }
-        instruction.type = type_of_call
-        @stack << type_of_return
-        return type_of_return
+      method_type = receiver_type.get_method_type(instruction.name)
+
+      if method_type
+        handle_known_method_call(instruction, method_type, arg_types, result_type, receiver_type)
+      else
+        handle_unknown_method_call(instruction, receiver_type, arg_types, result_type)
       end
 
-      analyze_call_with_known_receiver(type_of_receiver:, type_of_call:, instruction:)
-
-      instruction.type = type_of_call
-      @stack << type_of_return
-      type_of_return
-    end
-
-    def analyze_call_with_known_receiver(type_of_receiver:, type_of_call:, instruction:)
-      type_of_method = retrieve_method(type_of_receiver, instruction.name)
-      unless type_of_method
-        raise UndefinedMethod, "undefined method #{instruction.name} for type #{type_of_receiver.inspect}"
-      end
-
-      unify_type(type_of_method, type_of_call, instruction)
+      @stack << result_type
     end
 
     def analyze_class(instruction)
-      class_type = @classes[instruction.name] = ClassType.new(instruction.name)
-      object_type = ObjectType.new(class_type)
-      @methods[class_type.name_for_method_lookup] = { new: MethodType.new(class_type, object_type) }
+      class_type = ClassType.new(instruction.name.to_s)
 
-      @scope_stack << { vars: {}, self_type: class_type }
-      analyze_instruction(instruction.body)
+      @classes[instruction.name] = class_type
+
+      new_method_type = MethodType.new(name: :new, self_type: class_type, param_types: [], return_type: class_type)
+      class_type.define_method_type(:new, new_method_type)
+
+      class_scope = Scope.new(self_type: class_type, method_params: [], type_checker: self)
+      @scope_stack.push(class_scope)
+      analyze_array_of_instructions(instruction.body)
       @scope_stack.pop
 
       instruction.type = class_type
     end
 
     def analyze_def(instruction)
-      placeholder_var = TypeVariable.new(self)
-      vars[instruction.name] = placeholder_var.non_generic!
-      @methods[current_object_type&.name_for_method_lookup][instruction.name] = placeholder_var.non_generic!
+      param_types = instruction.params.map { TypeVariable.new(self) }
+      method_scope = Scope.new(self_type: scope.self_type, method_params: param_types, type_checker: self)
+      instruction.params.each_with_index do |param_name, index|
+        method_scope.set_var_type(param_name, param_types[index])
+      end
 
-      new_vars = {}
-      parameter_types = instruction.params.map { |param| new_vars[param] = TypeVariable.new(self).non_generic! }
-
-      @scope_stack << scope.merge(parameter_types:, vars: new_vars)
-      type_of_body = analyze_instruction(instruction.body)
+      @scope_stack.push(method_scope)
+      return_type = analyze_array_of_instructions(instruction.body)
       @scope_stack.pop
 
-      type_of_method = MethodType.new(current_object_type, *parameter_types, type_of_body)
-      unify_type(type_of_method, placeholder_var, instruction)
-
-      @methods[current_object_type&.name_for_method_lookup][instruction.name] = type_of_method.non_generic!
-      instruction.type = type_of_method
-
-      type_of_method
+      method_type =
+        MethodType.new(
+          name: instruction.name,
+          self_type: scope.self_type,
+          param_types: param_types,
+          return_type: return_type,
+        )
+      scope.self_type.define_method_type(instruction.name, method_type)
+      instruction.type = method_type
     end
 
     def analyze_if(instruction)
-      _condition = pop
-      type_of_then = analyze_instruction(instruction.if_true)
-      type_of_else = analyze_instruction(instruction.if_false)
-      unify_type(type_of_then, type_of_else, instruction)
-      instruction.type = type_of_then
+      condition_type = @stack.pop
+      add_constraint(Constraint.new(BoolType, condition_type, context: :if_condition))
+
+      if_true_type = analyze_array_of_instructions(instruction.if_true)
+      if_false_type = analyze_array_of_instructions(instruction.if_false)
+
+      result_type = TypeVariable.new(self)
+      add_constraint(Constraint.new(result_type, if_true_type, context: :if_branches))
+      add_constraint(Constraint.new(result_type, if_false_type, context: :if_branches))
+
+      instruction.type = result_type
+      @stack << result_type
     end
 
-    def analyze_while(instruction)
-      condition_type = analyze_instruction(instruction.condition)
-      body_type = analyze_instruction(instruction.body)
+    def analyze_instruction(instruction)
+      return analyze_array_of_instructions(instruction) if instruction.is_a?(Array)
 
-      # Check that condition evaluates to boolean after type inference
-      pruned_condition_type = condition_type.prune
-      unless pruned_condition_type == BoolType
-        raise TypeClash, "while condition must be bool, got #{pruned_condition_type}"
-      end
-
-      # While loops always return nil, regardless of body type
-      instruction.type = NilType
+      send("analyze_#{instruction.instruction_name}", instruction)
     end
 
     def analyze_pop(instruction)
       instruction.type = NilType
+      @stack.pop
     end
 
     def analyze_push_arg(instruction)
-      type = scope.fetch(:parameter_types).fetch(instruction.index)
-      @stack << type
-      instruction.type = type
+      if scope.method_params && instruction.index < scope.method_params.size
+        param_type = scope.method_params[instruction.index]
+        @stack << param_type
+        instruction.type = param_type
+      else
+        type_var = TypeVariable.new(self)
+        @stack << type_var
+        instruction.type = type_var
+      end
     end
 
     def analyze_push_array(instruction)
-      members = pop(instruction.size)
-      if members.any?(NilType)
-        members.map! do |type|
-          if type == NilType
-            NillableType.new(TypeVariable.new(self))
-          else
-            NillableType.new(type)
+      element_types = []
+      instruction.size.times { element_types.unshift(@stack.pop) }
+
+      if element_types.empty?
+        element_type = TypeVariable.new(self)
+        array_type = ArrayType.new(element_type)
+      else
+        first_element_type = element_types.first
+        element_types[1..].each do |element_type|
+          if !types_compatible?(first_element_type, element_type)
+            raise TypeClash,
+                  "the array contains type #{first_element_type} but you are trying to push type #{element_type}"
           end
         end
+
+        array_type = ArrayType.new(first_element_type)
       end
-      members.each_cons(2) { |a, b| unify_type(a, b, instruction) }
-      member_type = members.first || TypeVariable.new(self)
-      member_type.non_generic!
-      type_of_array = AryType.new(member_type)
-      @stack << type_of_array
-      instruction.type = type_of_array
+
+      instruction.type = array_type
+      @stack << array_type
     end
 
     def analyze_push_const(instruction)
-      klass = @classes[instruction.name]
-      @stack << klass
-      instruction.type = klass
+      class_type = @classes[instruction.name]
+      raise UndefinedVariable, "undefined constant #{instruction.name}" unless class_type
+
+      @stack << class_type
+      instruction.type = class_type
     end
 
     def analyze_push_false(instruction)
@@ -381,14 +492,27 @@ class Compiler
       instruction.type = IntType
     end
 
+    def analyze_push_ivar(instruction)
+      class_type = scope.self_type
+
+      var_type = class_type.get_instance_variable(instruction.name)
+      unless var_type
+        var_type = NilType
+        class_type.define_instance_variable(instruction.name, var_type)
+      end
+
+      @stack << var_type
+      instruction.type = var_type
+    end
+
     def analyze_push_nil(instruction)
       @stack << NilType
       instruction.type = NilType
     end
 
     def analyze_push_self(instruction)
-      @stack << current_object_type
-      instruction.type = current_object_type
+      @stack << scope.self_type
+      instruction.type = scope.self_type
     end
 
     def analyze_push_str(instruction)
@@ -402,222 +526,144 @@ class Compiler
     end
 
     def analyze_push_var(instruction)
-      type = retrieve_var(instruction.name)
-      raise UndefinedVariable, "undefined variable #{instruction.name.inspect}" unless type
-
-      @stack << type
-      instruction.type = type
+      value_type = scope.get_var_type(instruction.name)
+      @stack << value_type
+      instruction.type = value_type
     end
 
     def analyze_set_ivar(instruction)
-      type = pop
-      if (existing_type = vars[instruction.name])
-        unify_type(existing_type, type, instruction)
-        type = existing_type
-      elsif type == NilType
-        type = NillableType.new(TypeVariable.new(self))
-      elsif instruction.nillable?
-        type = NillableType.new(type)
+      value_type = @stack.pop
+
+      class_type = scope.self_type
+
+      if (existing_type = class_type.get_instance_variable(instruction.name))
+        constraint =
+          Constraint.new(
+            existing_type,
+            value_type,
+            context: :variable_reassignment,
+            context_data: {
+              variable_name: instruction.name,
+            },
+          )
+        add_constraint(constraint)
+      else
+        class_type.define_instance_variable(instruction.name, value_type)
       end
-      current_class_type.attributes[instruction.name] = type
-      instruction.type = type
+
+      @stack << value_type
+      instruction.type = value_type
     end
 
     def analyze_set_var(instruction)
-      type = pop
-      if (existing_type = vars[instruction.name])
-        unify_type(existing_type, type, instruction)
-        type = existing_type
-      elsif type == NilType
-        type = NillableType.new(TypeVariable.new(self))
-      elsif instruction.nillable?
-        type = NillableType.new(type)
-      end
-      vars[instruction.name] = type
-      instruction.type = type
+      value_type = @stack.pop
+      scope.set_var_type(instruction.name, value_type)
+      instruction.type = value_type
     end
 
-    def retrieve_method(type, name)
-      return unless (method = @methods.dig(type&.name_for_method_lookup, name))
+    def analyze_while(instruction)
+      condition_type = analyze_array_of_instructions(instruction.condition)
+      add_constraint(Constraint.new(BoolType, condition_type, context: :while_condition))
 
-      fresh_type(method)
+      analyze_array_of_instructions(instruction.body)
+
+      instruction.type = NilType
+      @stack << NilType
     end
 
-    def retrieve_var(name)
-      return unless (type = vars[name])
-
-      fresh_type(type)
+    def pop_arguments(arg_count)
+      arg_types = []
+      arg_count.times { arg_types.unshift(@stack.pop) }
+      arg_types
     end
 
-    def fresh_type(type, env = {})
-      type = type.prune
-      case type
-      when TypeVariable
-        if type.generic?
-          env[type] ||= TypeVariable.new(self)
-        else
-          type
-        end
-      when TypeOperator
-        type.dup.tap { |new_type| new_type.types = type.types.map { |t| fresh_type(t, env) } }
-      end
+    def handle_known_method_call(instruction, method_type, arg_types, result_type, receiver_type)
+      validate_argument_count(instruction.name, method_type.param_types.length, instruction.arg_count)
+      create_argument_constraints(method_type, arg_types, instruction.name, receiver_type)
+      add_constraint(Constraint.new(result_type, method_type.return_type))
+      instruction.type = method_type.return_type
     end
 
-    def unify_type(a, b, instruction = nil)
-      a = a.prune
-      b = b.prune
-      case a
-      when TypeVariable
-        unify_type_variable(a, b, instruction)
-      when TypeOperator
-        unify_type_operator(a, b, instruction)
-      else
-        raise "Unknown type: #{a.inspect}"
-      end
+    def handle_unknown_method_call(instruction, receiver_type, arg_types, result_type)
+      method_call_constraint =
+        MethodCallConstraint.new(
+          target: result_type,
+          receiver_type:,
+          method_name: instruction.name,
+          arg_types:,
+          type_checker: self,
+        )
+      add_constraint(method_call_constraint)
+      instruction.type = result_type
     end
 
-    def unify_type_variable(a, b, _instruction)
-      return if a == b
+    def validate_argument_count(method_name, expected_count, actual_count)
+      return if actual_count == expected_count
 
-      raise RecursiveUnification, "recursive unification: #{b} contains #{a}" if b.is_a?(TypeOperator) && b.contains?(a)
-
-      a.instance = b
+      raise ArgumentError,
+            "method #{method_name} expects #{expected_count} argument#{'s' if expected_count != 1}, got #{actual_count}"
     end
 
-    def unify_type_operator(a, b, instruction)
-      case b
-      when TypeVariable
-        unify_type_variable(b, a, instruction)
-      when TypeOperator
-        case a
-        when UnionType
-          unify_union_type(a, b, instruction)
-        when NillableType
-          unify_nillable_type(a, b, instruction)
-        else
-          case b
-          when UnionType
-            unify_union_type(b, a, instruction)
-          else
-            unify_type_operator_with_type_operator(a, b, instruction)
-          end
-        end
-      else
-        raise "Unknown type: #{b.inspect}"
+    def create_argument_constraints(method_type, arg_types, method_name, receiver_type)
+      arg_types.each_with_index do |arg_type, index|
+        next unless index < method_type.param_types.length
+
+        add_constraint(
+          Constraint.new(
+            method_type.param_types[index],
+            arg_type,
+            context: :method_argument,
+            context_data: {
+              method_name: method_name,
+              receiver_type: receiver_type,
+              arg_index: index + 1,
+            },
+          ),
+        )
       end
     end
 
-    def unify_nillable_type(a, b, instruction)
-      return if b.name == 'nil'
+    def types_compatible?(type1, type2)
+      resolved1 = type1.resolve!
+      resolved2 = type2.resolve!
 
-      if b.is_a?(NillableType)
-        unify_type(a.types.first, b.types.first, instruction)
-      elsif a.types.first.is_a?(TypeVariable)
-        unify_type(a.types.first, b)
-      else
-        raise_type_clash_error(a, b, instruction)
-      end
+      return true if resolved1.is_a?(TypeVariable) || resolved2.is_a?(TypeVariable)
+
+      resolved1 == resolved2
     end
 
-    def unify_union_type(a, b, instruction)
-      # If both are union types, check if they're the same
-      if b.is_a?(UnionType)
-        return if a.types.sort_by(&:name) == b.types.sort_by(&:name)
-        raise_type_clash_error(a, b, instruction)
-      end
-
-      unless (selected = a.select_type(b))
-        raise_type_clash_error(a, b, instruction)
-      end
-
-      unify_type(selected, b, instruction)
-    end
-
-    def unify_type_operator_with_type_operator(a, b, instruction)
-      raise_type_clash_error(a, b, instruction) unless a.name == b.name && a.types.size == b.types.size
-
-      begin
-        unify_args(a.types, b.types, instruction)
-      rescue TypeClash
-        # We want to produce an error message for the whole instruction, e.g.
-        # call, array, etc. -- not for an individual type inside.
-        raise_type_clash_error(a, b, instruction)
-      end
-    end
-
-    def unify_args(list1, list2, instruction)
-      list1.zip(list2) { |a, b| unify_type(a, b, instruction) }
-    end
-
-    def raise_type_clash_error(a, b, instruction = nil)
-      message =
-        case instruction
-        when CallInstruction
-          "#{a} cannot unify with #{b} in call to #{instruction.name} on line #{instruction.line}"
-        when IfInstruction
-          "one branch of `if` has type #{a} and the other has type #{b}"
-        when SetVarInstruction
-          "the variable #{instruction.name} has type #{a} already; you cannot change it to type #{b}"
-        when PushArrayInstruction
-          "the array contains type #{a} but you are trying to push type #{b}"
-        else
-          "#{a} cannot unify with #{b} #{instruction.inspect}"
-        end
-      raise TypeClash, message
-    end
-
-    def pop(count = nil)
-      if count
-        values = @stack.pop(count)
-        raise "Not enough values on stack! (Expected #{count} but got #{values.inspect})" unless values.size == count
-        return values
-      end
-
-      value = @stack.pop
-      raise 'Nothing on stack!' unless value
-      value
-    end
-
-    def scope
-      @scope_stack.last or raise('No scope!')
-    end
-
-    def vars
-      scope.fetch(:vars)
-    end
-
-    def current_class_type
-      scope.fetch(:self_type)
-    end
-
-    def current_object_type
-      ObjectType.new(current_class_type) if current_class_type
-    end
-
-    def build_initial_methods
-      array_type = TypeVariable.new(self)
-      array = AryType.new(array_type)
-      {
-        '(object main)': {
-          puts: MethodType.new(MainObject, UnionType.new(IntType, StrType, BoolType), IntType),
-        },
-        int: {
-          zero?: MethodType.new(IntType, BoolType),
-          '+': MethodType.new(IntType, IntType, IntType),
-          '==': MethodType.new(IntType, IntType, BoolType),
-          '<': MethodType.new(IntType, IntType, BoolType),
-          '-': MethodType.new(IntType, IntType, IntType),
-          '*': MethodType.new(IntType, IntType, IntType),
-          '/': MethodType.new(IntType, IntType, IntType),
-        },
-        array: {
-          nth: MethodType.new(array, IntType, array_type),
-          first: MethodType.new(array, array_type),
-          last: MethodType.new(array, array_type),
-          '<<': MethodType.new(array, array_type, array),
-          push: MethodType.new(array, array_type, array_type),
-        },
-      }.tap { |hash| hash.default_proc = proc { |h, key| h[key] = {} } }
-    end
+    BUILTIN_METHODS = {
+      Array: {
+        :first => ->(self_type) do
+          MethodType.new(self_type:, param_types: [], return_type: self_type.element_type, name: :first)
+        end,
+        :<< => ->(self_type) do
+          MethodType.new(self_type:, param_types: [self_type.element_type], return_type: self_type, name: :<<)
+        end,
+      },
+      Integer: {
+        :+ => MethodType.new(self_type: IntType, param_types: [IntType], return_type: IntType, name: :+),
+        :- => MethodType.new(self_type: IntType, param_types: [IntType], return_type: IntType, name: :-),
+        :* => MethodType.new(self_type: IntType, param_types: [IntType], return_type: IntType, name: :*),
+        :/ => MethodType.new(self_type: IntType, param_types: [IntType], return_type: IntType, name: :/),
+        :== => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :==),
+        :< => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :<),
+        :> => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :>),
+        :<= => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :<=),
+        :>= => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :>=),
+        :to_s => MethodType.new(self_type: IntType, param_types: [], return_type: StrType, name: :to_s),
+      },
+      String: {
+        :+ => MethodType.new(self_type: StrType, param_types: [StrType], return_type: StrType, name: :+),
+        :== => MethodType.new(self_type: StrType, param_types: [StrType], return_type: BoolType, name: :==),
+        :length => MethodType.new(self_type: StrType, param_types: [], return_type: IntType, name: :length),
+      },
+      Boolean: {
+        :== => MethodType.new(self_type: BoolType, param_types: [BoolType], return_type: BoolType, name: :==),
+      },
+      Object: {
+        puts: MethodType.new(self_type: ObjectClass, param_types: [StrType], return_type: IntType, name: :puts),
+      },
+    }.freeze
   end
 end

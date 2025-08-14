@@ -13,10 +13,8 @@ class Compiler
 
       raise "No type set on #{inspect}" unless @type
 
-      pruned = @type.prune
-      raise TypeError, "Not enough information to infer type of #{inspect}" if pruned.is_a?(TypeVariable)
-
-      @pruned_type = pruned
+      resolved = @type.resolve!
+      @pruned_type = resolved
     end
 
     def inspect
@@ -101,38 +99,47 @@ class Compiler
   end
 
   class SetVarInstruction < Instruction
-    def initialize(name, nillable:, line:)
+    def initialize(name, line:)
       super(line:)
       @name = name
-      @nillable = nillable
     end
 
     attr_reader :name
-
-    def nillable? = @nillable
 
     def instruction_name = :set_var
 
     def to_h
-      super.merge(name:, nillable: nillable?)
+      super.merge(name:)
     end
   end
 
   class SetInstanceVarInstruction < Instruction
-    def initialize(name, nillable:, line:)
+    def initialize(name, line:)
       super(line:)
       @name = name
-      @nillable = nillable
     end
 
     attr_reader :name
 
-    def nillable? = @nillable
-
     def instruction_name = :set_ivar
 
     def to_h
-      super.merge(name:, nillable: nillable?)
+      super.merge(name:)
+    end
+  end
+
+  class PushInstanceVarInstruction < Instruction
+    def initialize(name, line:)
+      super(line:)
+      @name = name
+    end
+
+    attr_reader :name
+
+    def instruction_name = :push_ivar
+
+    def to_h
+      super.merge(name:)
     end
   end
 

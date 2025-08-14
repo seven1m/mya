@@ -234,16 +234,8 @@ module SharedBackendExamples
         expect(out).must_equal("123\nfoo\n")
       end
 
-      it 'evaluates nillable strings' do
+      it 'evaluates strings' do
         code = <<~CODE
-          a = "foo" # a:nillable
-          a = nil
-          a
-        CODE
-        expect(execute(code)).must_be_nil
-
-        code = <<~CODE
-          a = nil
           a = "foo"
           a
         CODE

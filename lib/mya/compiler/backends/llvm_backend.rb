@@ -226,21 +226,14 @@ class Compiler
           ptr = read_rc_pointer(value)
           read_llvm_type_as_ruby(ptr, type)
         else
-          raise "Unknown type: #{type.inspect}" unless type.name == 'nillable'
-          if (ptr = read_rc_pointer(value, nillable: true))
-            read_llvm_type_as_ruby(ptr, type.types.first)
-          end
+          raise "Unknown type: #{type.inspect}"
         end
       end
 
-      def read_rc_pointer(value, nillable: false)
+      def read_rc_pointer(value)
         rc_ptr = value.to_ptr.read_pointer
-        if nillable && rc_ptr.null?
-          nil
-        else
-          # NOTE: this works because the ptr is the first field of the RC struct.
-          rc_ptr.read_pointer
-        end
+        # NOTE: this works because the ptr is the first field of the RC struct.
+        rc_ptr.read_pointer
       end
 
       def read_llvm_type_as_ruby(value, type)

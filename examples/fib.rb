@@ -8,4 +8,4 @@ def fib(n)
   end
 end
 
-puts fib(10)
+puts fib(10).to_s

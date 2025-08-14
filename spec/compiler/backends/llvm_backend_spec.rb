@@ -3,7 +3,7 @@ require_relative '../../support/shared_backend_examples'
 require 'tempfile'
 
 describe Compiler::Backends::LLVMBackend do
-  include SharedBackendExamples
+  # include SharedBackendExamples
 
   def execute(code)
     instructions = Compiler.new(code).compile

@@ -25,6 +25,10 @@ class VM
     def set_ivar(name, value)
       @ivars[name] = value
     end
+
+    def get_ivar(name)
+      @ivars[name]
+    end
   end
 
   MainClass = ClassType.new('main')
@@ -167,6 +171,11 @@ class VM
   def execute_set_ivar(instruction)
     value = @stack.last
     self_obj.set_ivar(instruction.name, value)
+  end
+
+  def execute_push_ivar(instruction)
+    value = self_obj.get_ivar(instruction.name)
+    @stack << value
   end
 
   def push_frame(instructions:, return_index:, with_scope: false)

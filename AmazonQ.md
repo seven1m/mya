@@ -5,7 +5,7 @@ This is a Ruby-based compiler project called "Mya" that compiles a statically-ty
 
 ## Architecture
 - **Compiler**: Main compilation pipeline using Prism parser
-- **TypeChecker**: Hindley-Milner style type inference with unification
+- **TypeChecker**: Constraint solver
 - **VM**: Virtual machine for executing compiled code
 - **Instructions**: Intermediate representation for compiled code
 - **Backends**: Code generation (currently LLVM)
