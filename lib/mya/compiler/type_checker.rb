@@ -145,12 +145,13 @@ class Compiler
     end
 
     class MethodCallConstraint < Constraint
-      def initialize(target:, receiver_type:, method_name:, arg_types:, type_checker:)
+      def initialize(target:, receiver_type:, method_name:, arg_types:, type_checker:, instruction:)
         @target = target
         @receiver_type = receiver_type
         @method_name = method_name
         @arg_types = arg_types
         @type_checker = type_checker
+        @instruction = instruction
       end
 
       attr_reader :target, :receiver_type, :method_name, :arg_types
@@ -162,6 +163,8 @@ class Compiler
 
         method_type = receiver_resolved.get_method_type(@method_name)
         return false unless method_type
+
+        @instruction.type = method_type
 
         expected_count = method_type.param_types.length
         actual_count = @arg_types.length
@@ -673,7 +676,7 @@ class Compiler
       validate_argument_count(instruction.name, method_type.param_types.length, instruction.arg_count)
       create_argument_constraints(method_type, arg_types, instruction.name, receiver_type)
       add_constraint(Constraint.new(result_type, method_type.return_type))
-      instruction.type = method_type.return_type
+      instruction.type = method_type
     end
 
     def handle_unknown_method_call(instruction, receiver_type, arg_types, result_type)
@@ -684,6 +687,7 @@ class Compiler
           method_name: instruction.name,
           arg_types:,
           type_checker: self,
+          instruction:,
         )
       add_constraint(method_call_constraint)
       instruction.type = result_type
