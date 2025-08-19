@@ -363,6 +363,66 @@ describe Compiler do
     expect(e.message).must_equal 'Object#add argument 1 has type Integer, but you passed String'
   end
 
+  it 'compiles method with Option type annotations' do
+    code = <<~CODE
+      def maybe_greet(name) # name:Option[String]
+        if name
+          puts "Hello, " + name.value
+        else
+          0
+        end
+      end
+
+      maybe_greet(nil)
+      maybe_greet("Tim")
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Object#maybe_greet(Option[String]) => Integer',
+                               instruction: :def,
+                               name: :maybe_greet,
+                               params: [:name],
+                               body: [
+                                 { type: 'Option[String]', instruction: :push_arg, index: 0 },
+                                 { type: 'Option[String]', instruction: :set_var, name: :name },
+                                 { type: 'Option[String]', instruction: :push_var, name: :name },
+                                 {
+                                   type: 'Integer',
+                                   instruction: :if,
+                                   if_true: [
+                                     { type: 'Object', instruction: :push_self },
+                                     { type: 'String', instruction: :push_str, value: 'Hello, ' },
+                                     { type: 'Option[String]', instruction: :push_var, name: :name },
+                                     { type: 'String', instruction: :call, name: :value, arg_count: 0 },
+                                     { type: 'String', instruction: :call, name: :+, arg_count: 1 },
+                                     { type: 'Integer', instruction: :call, name: :puts, arg_count: 1 },
+                                   ],
+                                   if_false: [{ type: 'Integer', instruction: :push_int, value: 0 }],
+                                 },
+                               ],
+                             },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'NilClass', instruction: :push_nil },
+                             { type: 'Integer', instruction: :call, name: :maybe_greet, arg_count: 1 },
+                             { type: 'NilClass', instruction: :pop },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'String', instruction: :push_str, value: 'Tim' },
+                             { type: 'Integer', instruction: :call, name: :maybe_greet, arg_count: 1 },
+                           ]
+  end
+
+  it 'raises for invalid type passed to Option parameter' do
+    code = <<~CODE
+      def process_optional(value) # value:Option[String]
+        value
+      end
+
+      process_optional(42)
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'Object#process_optional argument 1 has type Option[String], but you passed Integer'
+  end
+
   it 'compiles arrays' do
     code = <<~CODE
      a = [1, 2, 3]

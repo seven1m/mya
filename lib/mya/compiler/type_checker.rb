@@ -50,6 +50,14 @@ class Compiler
         elsif source_resolved.is_a?(TypeVariable)
           # This constraint will be solved later when the source type is resolved
           return false
+        elsif can_coerce_to_option?(target_resolved, source_resolved)
+          # Allow coercion to Option types:
+          # - nil can be coerced to Option[T] (representing None)
+          # - T can be coerced to Option[T] (representing Some(T))
+          return false
+        elsif can_use_as_boolean?(target_resolved, source_resolved)
+          # Allow Option types to be used as boolean conditions
+          return false
         elsif target_resolved.class != source_resolved.class ||
               (target_resolved.respond_to?(:name) && target_resolved.name != source_resolved.name)
           case @context
@@ -75,6 +83,27 @@ class Compiler
         end
 
         return false
+      end
+
+      private
+
+      def can_coerce_to_option?(target, source)
+        return false unless target.is_a?(OptionType)
+
+        # Allow nil to be coerced to Option[T] (None)
+        return true if source.name == 'NilClass'
+
+        # Allow T to be coerced to Option[T] (Some(T))
+        return true if target.inner_type == source
+
+        false
+      end
+
+      def can_use_as_boolean?(target, source)
+        # Allow Option types to be used as boolean conditions
+        return true if target.name == 'Boolean' && source.is_a?(OptionType)
+
+        false
       end
     end
 
@@ -255,6 +284,29 @@ class Compiler
       def ==(other)
         return false unless other.is_a?(ArrayType)
         element_type == other.element_type
+      end
+    end
+
+    class OptionType < Type
+      def initialize(inner_type)
+        @inner_type = inner_type
+      end
+
+      attr_reader :inner_type
+
+      def resolve! = self
+
+      def to_s = "Option[#{inner_type.resolve!}]"
+
+      def name = :Option
+
+      def get_method_type(method_name)
+        get_builtin_method_type(method_name, BUILTIN_METHODS[:Option])
+      end
+
+      def ==(other)
+        return false unless other.is_a?(OptionType)
+        inner_type == other.inner_type
       end
     end
 
@@ -580,19 +632,34 @@ class Compiler
       @stack << NilType
     end
 
-    def resolve_type_from_name(type_name)
-      case type_name
-      when :Integer
-        IntType
-      when :String
-        StrType
-      when :Boolean
-        BoolType
-      when :Nil
-        NilType
+    def resolve_type_from_name(type_spec)
+      # Handle generic types like { generic: :Option, inner: :String }
+      if type_spec.is_a?(Hash) && type_spec[:generic]
+        case type_spec[:generic]
+        when :Option
+          inner_type = resolve_type_from_name(type_spec[:inner])
+          OptionType.new(inner_type)
+        when :Array
+          inner_type = resolve_type_from_name(type_spec[:inner])
+          ArrayType.new(inner_type)
+        else
+          raise UndefinedVariable, "undefined generic type #{type_spec[:generic]}"
+        end
       else
-        # Check if it's a defined class
-        @classes[type_name] || raise(UndefinedVariable, "undefined type #{type_name}")
+        # Handle simple types
+        case type_spec
+        when :Integer, :Int
+          IntType
+        when :String, :Str
+          StrType
+        when :Boolean, :Bool
+          BoolType
+        when :NilClass, :Nil
+          NilType
+        else
+          # Check if it's a defined class
+          @classes[type_spec] || raise(UndefinedVariable, "undefined type #{type_spec}")
+        end
       end
     end
 
@@ -664,6 +731,21 @@ class Compiler
         end,
         :<< => ->(self_type) do
           MethodType.new(self_type:, param_types: [self_type.element_type], return_type: self_type, name: :<<)
+        end,
+      },
+      Option: {
+        is_some: ->(self_type) { MethodType.new(self_type:, param_types: [], return_type: BoolType, name: :is_some) },
+        is_none: ->(self_type) { MethodType.new(self_type:, param_types: [], return_type: BoolType, name: :is_none) },
+        value: ->(self_type) do
+          MethodType.new(self_type:, param_types: [], return_type: self_type.inner_type, name: :value)
+        end,
+        value_or: ->(self_type) do
+          MethodType.new(
+            self_type:,
+            param_types: [self_type.inner_type],
+            return_type: self_type.inner_type,
+            name: :value_or,
+          )
         end,
       },
       Integer: {

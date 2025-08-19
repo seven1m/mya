@@ -36,9 +36,20 @@ class Compiler
 
   def parse_type_annotations(text)
     annotations = {}
-    # Match patterns like "a:Integer, b:String" or "a: Integer, b: String"
-    text.scan(/(\w+)\s*:\s*(\w+)/) { |param_name, type_name| annotations[param_name.to_sym] = type_name.to_sym }
+    # Match patterns like "a:Integer", "b:String", "c:Option[String]"
+    text.scan(/(\w+)\s*:\s*([A-Z]\w*(?:\[[A-Z]\w*\])?)/) do |param_name, type_spec|
+      annotations[param_name.to_sym] = parse_type_spec(type_spec)
+    end
     annotations
+  end
+
+  def parse_type_spec(type_spec)
+    # Handle generic types like Option[String]
+    if type_spec =~ /^(\w+)\[(\w+)\]$/
+      { generic: $1.to_sym, inner: $2.to_sym }
+    else
+      type_spec.to_sym
+    end
   end
 
   def compile
