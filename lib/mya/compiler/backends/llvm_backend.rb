@@ -359,7 +359,8 @@ class Compiler
           Option: {
             value: ->(builder:, args:, **) do
               # For Option types, the value is the pointer itself (when not null)
-              # This assumes the Option is Some(value), not None
+              # This works for Option[String] since strings are already pointers
+              # Note: Option[Integer] is not supported - integers are native types
               args.first
             end,
             is_some: ->(builder:, args:, **) do

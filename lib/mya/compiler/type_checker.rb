@@ -199,26 +199,17 @@ class Compiler
       end
     end
 
-    class ConcreteType < Type
-      def initialize(name)
-        @name = name
-      end
-
-      attr_reader :name
-
-      def resolve! = self
-
-      def to_s = name
-    end
-
     class ClassType < Type
-      def initialize(name)
+      def initialize(name, native: false)
         @name = name
         @methods = {}
         @instance_variables = {}
+        @native = native
       end
 
       attr_reader :name
+
+      def native? = @native
 
       def resolve! = self
 
@@ -319,10 +310,10 @@ class Compiler
       end
     end
 
-    IntType = ClassType.new('Integer')
+    BoolType = ClassType.new('Boolean', native: true)
+    IntType = ClassType.new('Integer', native: true)
+    NilType = ClassType.new('NilClass', native: true)
     StrType = ClassType.new('String')
-    BoolType = ClassType.new('Boolean')
-    NilType = ClassType.new('NilClass')
 
     ObjectClass = ClassType.new('Object')
 
@@ -651,6 +642,11 @@ class Compiler
         case type_spec[:generic]
         when :Option
           inner_type = resolve_type_from_name(type_spec[:inner])
+          if inner_type.native?
+            raise NotImplementedError,
+                  "Option[#{inner_type.name}] is not supported since #{inner_type.name} is a native type"
+          end
+
           OptionType.new(inner_type)
         when :Array
           inner_type = resolve_type_from_name(type_spec[:inner])

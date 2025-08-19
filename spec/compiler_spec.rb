@@ -675,6 +675,36 @@ describe Compiler do
     expect(e.message).must_equal 'Object#process_optional argument 1 has type Option[String], but you passed Integer'
   end
 
+  it 'raises error for Option[Integer] - not supported' do
+    code = <<~CODE
+      def process_number(value) # value:Option[Integer]
+        value
+      end
+    CODE
+    e = expect { compile(code) }.must_raise NotImplementedError
+    expect(e.message).must_equal 'Option[Integer] is not supported since Integer is a native type'
+  end
+
+  it 'raises error for Option[Boolean] - not supported' do
+    code = <<~CODE
+      def process_flag(value) # value:Option[Boolean]
+        value
+      end
+    CODE
+    e = expect { compile(code) }.must_raise NotImplementedError
+    expect(e.message).must_equal 'Option[Boolean] is not supported since Boolean is a native type'
+  end
+
+  it 'raises error for Option with any native type' do
+    code = <<~CODE
+      def process_nil(value) # value:Option[NilClass]
+        value
+      end
+    CODE
+    e = expect { compile(code) }.must_raise NotImplementedError
+    expect(e.message).must_equal 'Option[NilClass] is not supported since NilClass is a native type'
+  end
+
   it 'compiles arrays' do
     code = <<~CODE
      a = [1, 2, 3]
