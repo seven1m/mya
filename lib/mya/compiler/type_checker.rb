@@ -392,7 +392,16 @@ class Compiler
     end
 
     def analyze_def(instruction)
-      param_types = instruction.params.map { TypeVariable.new(self) }
+      param_types =
+        instruction.params.map.with_index do |param_name, index|
+          # Check if there's a type annotation for this parameter
+          if instruction.type_annotations && (type_name = instruction.type_annotations[param_name])
+            resolve_type_from_name(type_name)
+          else
+            TypeVariable.new(self)
+          end
+        end
+
       method_scope = Scope.new(self_type: scope.self_type, method_params: param_types, type_checker: self)
       instruction.params.each_with_index do |param_name, index|
         method_scope.set_var_type(param_name, param_types[index])
@@ -569,6 +578,22 @@ class Compiler
 
       instruction.type = NilType
       @stack << NilType
+    end
+
+    def resolve_type_from_name(type_name)
+      case type_name
+      when :Integer
+        IntType
+      when :String
+        StrType
+      when :Boolean
+        BoolType
+      when :Nil
+        NilType
+      else
+        # Check if it's a defined class
+        @classes[type_name] || raise(UndefinedVariable, "undefined type #{type_name}")
+      end
     end
 
     def pop_arguments(arg_count)

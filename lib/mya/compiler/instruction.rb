@@ -214,10 +214,11 @@ class Compiler
       super(line:)
       @name = name
       @params = []
+      @type_annotations = {}
     end
 
     attr_reader :name
-    attr_accessor :body, :params
+    attr_accessor :body, :params, :type_annotations
 
     def instruction_name = :def
 

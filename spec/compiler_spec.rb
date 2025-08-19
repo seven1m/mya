@@ -298,6 +298,71 @@ describe Compiler do
     expect(e.message).must_equal('Object#same? argument 1 has type Foo, but you passed Bar')
   end
 
+  it 'compiles method definitions with type annotations' do
+    code = <<~CODE
+      def add(a, b) # a:Integer, b:Integer
+        a + b
+      end
+
+      def greet(name) # name:String
+        "Hello " + name
+      end
+
+      add(5, 10)
+      greet("World")
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Object#add(Integer, Integer) => Integer',
+                               instruction: :def,
+                               name: :add,
+                               params: %i[a b],
+                               body: [
+                                 { type: 'Integer', instruction: :push_arg, index: 0 },
+                                 { type: 'Integer', instruction: :set_var, name: :a },
+                                 { type: 'Integer', instruction: :push_arg, index: 1 },
+                                 { type: 'Integer', instruction: :set_var, name: :b },
+                                 { type: 'Integer', instruction: :push_var, name: :a },
+                                 { type: 'Integer', instruction: :push_var, name: :b },
+                                 { type: 'Integer', instruction: :call, name: :+, arg_count: 1 },
+                               ],
+                             },
+                             {
+                               type: 'Object#greet(String) => String',
+                               instruction: :def,
+                               name: :greet,
+                               params: [:name],
+                               body: [
+                                 { type: 'String', instruction: :push_arg, index: 0 },
+                                 { type: 'String', instruction: :set_var, name: :name },
+                                 { type: 'String', instruction: :push_str, value: 'Hello ' },
+                                 { type: 'String', instruction: :push_var, name: :name },
+                                 { type: 'String', instruction: :call, name: :+, arg_count: 1 },
+                               ],
+                             },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'Integer', instruction: :push_int, value: 5 },
+                             { type: 'Integer', instruction: :push_int, value: 10 },
+                             { type: 'Integer', instruction: :call, name: :add, arg_count: 2 },
+                             { type: 'NilClass', instruction: :pop },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'String', instruction: :push_str, value: 'World' },
+                             { type: 'String', instruction: :call, name: :greet, arg_count: 1 },
+                           ]
+  end
+
+  it 'raises error for type annotation with wrong type' do
+    code = <<~CODE
+      def add(a, b) # a:Integer, b:Integer
+        a + b
+      end
+
+      add("hello", 5)
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'Object#add argument 1 has type Integer, but you passed String'
+  end
+
   it 'compiles arrays' do
     code = <<~CODE
      a = [1, 2, 3]

@@ -14,15 +14,31 @@ class Compiler
         .comments
         .each_with_object({}) do |comment, directives|
           text = comment.location.slice
+          line = comment.location.start_line
+          directives[line] ||= {}
+
+          # Parse type annotations like "a:Integer, b:String"
+          if text =~ /#\s*(.+)/
+            annotation_text = $1.strip
+            type_annotations = parse_type_annotations(annotation_text)
+            directives[line][:type_annotations] = type_annotations unless type_annotations.empty?
+          end
+
+          # Parse existing directives
           text.split.each do |directive|
             next unless directive =~ /^([a-z][a-z_]*):([a-z_]+)$/
 
-            line = comment.location.start_line
-            directives[line] ||= {}
             directives[line][$1.to_sym] ||= []
             directives[line][$1.to_sym] << $2.to_sym
           end
         end
+  end
+
+  def parse_type_annotations(text)
+    annotations = {}
+    # Match patterns like "a:Integer, b:String" or "a: Integer, b: String"
+    text.scan(/(\w+)\s*:\s*(\w+)/) { |param_name, type_name| annotations[param_name.to_sym] = type_name.to_sym }
+    annotations
   end
 
   def compile
@@ -76,6 +92,11 @@ class Compiler
     @scope_stack << { vars: {} }
     params = node.parameters&.requireds || []
     instruction = DefInstruction.new(node.name, line: node.location.start_line)
+
+    if (line_directives = @directives[node.location.start_line]) && (annotations = line_directives[:type_annotations])
+      instruction.type_annotations = annotations
+    end
+
     def_instructions = []
     params.each_with_index do |param, index|
       i1 = PushArgInstruction.new(index, line: node.location.start_line)
