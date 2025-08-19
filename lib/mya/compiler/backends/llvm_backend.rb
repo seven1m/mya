@@ -133,6 +133,30 @@ class Compiler
         @stack << builder.load(result)
       end
 
+      def build_while(instruction, function, builder)
+        condition_block = function.basic_blocks.append
+        body_block = function.basic_blocks.append
+        exit_block = function.basic_blocks.append
+
+        builder.br(condition_block)
+
+        condition_block.build do |condition_builder|
+          build_instructions(function, condition_builder, instruction.condition) do |condition_value|
+            condition_builder.cond(condition_value, body_block, exit_block)
+          end
+        end
+
+        body_block.build do |body_builder|
+          build_instructions(function, body_builder, instruction.body)
+          body_builder.br(condition_block) # Loop back to condition
+        end
+
+        builder.position_at_end(exit_block)
+
+        # While loops always return nil
+        @stack << RcBuilder.pointer_type.null_pointer
+      end
+
       def build_pop(_instruction, _function, _builder)
         @stack.pop
       end
@@ -186,9 +210,13 @@ class Compiler
 
       def build_set_var(instruction, _function, builder)
         value = @stack.pop
-        variable = builder.alloca(value.type, "var_#{instruction.name}")
-        builder.store(value, variable)
-        vars[instruction.name] = variable
+        if vars[instruction.name]
+          builder.store(value, vars[instruction.name])
+        else
+          variable = builder.alloca(value.type, "var_#{instruction.name}")
+          builder.store(value, variable)
+          vars[instruction.name] = variable
+        end
       end
 
       def scope
@@ -294,6 +322,7 @@ class Compiler
             '/': ->(builder:, args:, **) { builder.sdiv(*args) },
             '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
             '<': ->(builder:, args:, **) { builder.icmp(:slt, *args) },
+            '>': ->(builder:, args:, **) { builder.icmp(:sgt, *args) },
             to_s: ->(builder:, args:, **) { builder.call(fn_int_to_string, args.first) },
           },
           String: {

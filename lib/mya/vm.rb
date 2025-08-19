@@ -46,16 +46,7 @@ class VM
 
   def run
     @index = 0
-    while @frames.any?
-      while @index < instructions.size
-        instruction = instructions[@index]
-        @index += 1
-        execute(instruction)
-      end
-      frame = @frames.pop
-      @scope_stack.pop if frame[:with_scope]
-      @index = frame.fetch(:return_index)
-    end
+    execute_frame_stack
     @stack.pop
   end
 
@@ -119,8 +110,55 @@ class VM
     push_frame(instructions: body, return_index: @index)
   end
 
+  def execute_while(instruction)
+    loop do
+      condition_frame = { instructions: instruction.condition, return_index: nil, with_scope: false }
+      condition_result = execute_frames([condition_frame])
+
+      break unless condition_result
+
+      body_frame = { instructions: instruction.body, return_index: nil, with_scope: false }
+      execute_frames([body_frame])
+    end
+
+    # While loops always return nil
+    @stack << nil
+  end
+
   def execute_pop(_)
     @stack.pop
+  end
+
+  private
+
+  def execute_frames(frames)
+    saved_frames = @frames
+    saved_index = @index
+
+    @frames = frames
+    @index = 0
+
+    execute_frame_stack
+
+    result = @stack.last
+
+    @frames = saved_frames
+    @index = saved_index
+
+    result
+  end
+
+  def execute_frame_stack
+    while @frames.any?
+      while @index < instructions.size
+        instruction = instructions[@index]
+        @index += 1
+        execute(instruction)
+      end
+      frame = @frames.pop
+      @scope_stack.pop if frame[:with_scope]
+      @index = frame[:return_index] if frame[:return_index]
+    end
   end
 
   def execute_push_arg(instruction)

@@ -222,6 +222,49 @@ module SharedBackendExamples
         expect(execute(code)).must_equal('foo')
       end
 
+      it 'evaluates while loops' do
+        code = <<~CODE
+          i = 0
+          sum = 0
+          while i < 5
+            sum = sum + i
+            i = i + 1
+          end
+          sum
+        CODE
+        expect(execute(code)).must_equal(10)
+      end
+
+      it 'evaluates while loops that never execute' do
+        code = <<~CODE
+          i = 10
+          sum = 42
+          while i < 5
+            sum = sum + i
+            i = i + 1
+          end
+          sum
+        CODE
+        expect(execute(code)).must_equal(42)
+      end
+
+      it 'evaluates nested while loops' do
+        code = <<~CODE
+          i = 0
+          result = 0
+          while i < 3
+            j = 0
+            while j < 2
+              result = result + 1
+              j = j + 1
+            end
+            i = i + 1
+          end
+          result
+        CODE
+        expect(execute(code)).must_equal(6)
+      end
+
       it 'evaluates examples/fib.rb' do
         result = execute_file(File.expand_path('../../examples/fib.rb', __dir__))
         expect(result).must_equal("55\n")
@@ -230,6 +273,11 @@ module SharedBackendExamples
       it 'evaluates examples/fact.rb' do
         result = execute_file(File.expand_path('../../examples/fact.rb', __dir__))
         expect(result).must_equal("3628800\n")
+      end
+
+      it 'evaluates examples/countdown.rb' do
+        result = execute_file(File.expand_path('../../examples/countdown.rb', __dir__))
+        expect(result).must_equal("5\n4\n3\n2\n1\nDone!\n")
       end
     end
   end
