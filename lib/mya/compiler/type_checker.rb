@@ -733,6 +733,9 @@ class Compiler
         :first => ->(self_type) do
           MethodType.new(self_type:, param_types: [], return_type: self_type.element_type, name: :first)
         end,
+        :last => ->(self_type) do
+          MethodType.new(self_type:, param_types: [], return_type: self_type.element_type, name: :last)
+        end,
         :<< => ->(self_type) do
           MethodType.new(self_type:, param_types: [self_type.element_type], return_type: self_type, name: :<<)
         end,

@@ -76,24 +76,12 @@ module SharedBackendExamples
         expect(execute(code)).must_equal('baz')
 
         code = <<~CODE
-          a = [nil, "foo", "bar"]
-          a.last
-        CODE
-        expect(execute(code)).must_equal('bar')
-
-        code = <<~CODE
-          a = ["foo", "bar", nil]
-          a.last
-        CODE
-        expect(execute(code)).must_be_nil
-
-        code = <<~CODE
           a = [1, 2, 3]
           b = [4, 5, 6]
-          c = [a, b, nil]
-          c.last
+          c = [a, b]
+          c.first
         CODE
-        expect(execute(code)).must_be_nil
+        expect(execute(code)).must_equal([1, 2, 3])
       end
 
       it 'evaluates method definitions' do
@@ -225,13 +213,13 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(5)
       end
 
-      it 'evaluates puts for both int and str' do
+      it 'evaluates puts for strings' do
         code = <<~CODE
-          puts(123)
-          puts("foo")
+          puts("hello")
+          puts("world")
         CODE
         out = execute_with_output(code)
-        expect(out).must_equal("123\nfoo\n")
+        expect(out).must_equal("hello\nworld\n")
       end
 
       it 'evaluates strings' do

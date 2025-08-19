@@ -3,7 +3,7 @@ require_relative 'support/shared_backend_examples'
 require 'stringio'
 
 describe VM do
-  # include SharedBackendExamples
+  include SharedBackendExamples
 
   def execute(code, io: $stdout)
     instructions = Compiler.new(code).compile
