@@ -490,12 +490,16 @@ class Compiler
       if_true_type = analyze_array_of_instructions(instruction.if_true)
       if_false_type = analyze_array_of_instructions(instruction.if_false)
 
-      result_type = TypeVariable.new(self)
-      add_constraint(Constraint.new(result_type, if_true_type, context: :if_branches))
-      add_constraint(Constraint.new(result_type, if_false_type, context: :if_branches))
-
-      instruction.type = result_type
-      @stack << result_type
+      if instruction.used
+        result_type = TypeVariable.new(self)
+        add_constraint(Constraint.new(result_type, if_true_type, context: :if_branches))
+        add_constraint(Constraint.new(result_type, if_false_type, context: :if_branches))
+        instruction.type = result_type
+        @stack << result_type
+      else
+        instruction.type = NilType
+        @stack << NilType
+      end
     end
 
     def analyze_instruction(instruction)

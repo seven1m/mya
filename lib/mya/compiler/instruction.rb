@@ -193,7 +193,7 @@ class Compiler
   end
 
   class IfInstruction < Instruction
-    attr_accessor :if_true, :if_false
+    attr_accessor :if_true, :if_false, :used
 
     def instruction_name = :if
 

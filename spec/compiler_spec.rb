@@ -792,14 +792,37 @@ describe Compiler do
     expect(e.message).must_equal 'one branch of `if` has type Integer and the other has type String'
   end
 
-  it 'raises error for if without else clause' do
+  it 'allows if statements without else clause' do
     code = <<~CODE
        if true
          42
        end
+       nil
      CODE
-    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal 'one branch of `if` has type Integer and the other has type NilClass'
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'Boolean', instruction: :push_true },
+                             {
+                               type: 'NilClass',
+                               instruction: :if,
+                               if_true: [
+                                 { type: 'Integer', instruction: :push_int, value: 42 },
+                                 { type: 'NilClass', instruction: :pop },
+                               ],
+                               if_false: [{ type: 'NilClass', instruction: :push_nil }],
+                             },
+                             { type: 'NilClass', instruction: :pop },
+                             { type: 'NilClass', instruction: :push_nil },
+                           ]
+  end
+
+  it 'raises error for if expressions without else clause' do
+    code = <<~CODE
+       x = if true
+             42
+           end
+     CODE
+    e = expect { compile(code) }.must_raise SyntaxError
+    expect(e.message).must_equal 'if expression used as value must have an else clause (line 1)'
   end
 
   it 'raises error for non-boolean if condition' do

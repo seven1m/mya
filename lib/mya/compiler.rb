@@ -137,13 +137,22 @@ class Compiler
   def transform_if_node(node, used:)
     transform(node.predicate, used: true)
     instruction = IfInstruction.new(line: node.location.start_line)
+    instruction.used = used
     instruction.if_true = []
-    with_instructions_array(instruction.if_true) { transform(node.statements, used: true) }
+    with_instructions_array(instruction.if_true) do
+      transform(node.statements, used: true)
+      @instructions << PopInstruction.new unless used
+    end
     instruction.if_false = []
     if node.consequent
-      with_instructions_array(instruction.if_false) { transform(node.consequent, used: true) }
+      with_instructions_array(instruction.if_false) do
+        transform(node.consequent, used: true)
+        @instructions << PopInstruction.new unless used
+      end
+    elsif used
+      raise SyntaxError, "if expression used as value must have an else clause (line #{node.location.start_line})"
     else
-      # No else clause - push nil
+      # If statement without else clause - push nil but it won't be used
       with_instructions_array(instruction.if_false) { @instructions << PushNilInstruction.new }
     end
     @instructions << instruction
