@@ -197,14 +197,14 @@ describe Compiler do
                            ]
   end
 
-  it 'raises error for unknown method arg type' do
+  it 'raises helpful error for unknown method parameter type' do
     code = <<~CODE
        def foo(x)
          x
        end
      CODE
     e = expect { compile(code) }.must_raise TypeError
-    expect(e.message).must_equal("Not enough information to infer type of type variable 'a'")
+    expect(e.message).must_equal('Not enough information to infer type of parameter `x` for method `foo` (line 1)')
   end
 
   # NOTE: we don't support monomorphization (yet!)
@@ -819,7 +819,7 @@ describe Compiler do
       end
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal 'one branch of `if` has type Integer and the other has type String'
+    expect(e.message).must_equal 'one branch of `if` has type Integer and the other has type String (line 1)'
   end
 
   it 'allows if statements without else clause' do
@@ -864,7 +864,7 @@ describe Compiler do
        end
      CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal '`if` condition must be Boolean, got Integer'
+    expect(e.message).must_equal '`if` condition must be Boolean, got Integer (line 1)'
   end
 
   it 'compiles while expressions' do
@@ -914,7 +914,7 @@ describe Compiler do
       end
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
-    expect(e.message).must_equal '`while` condition must be Boolean, got String'
+    expect(e.message).must_equal '`while` condition must be Boolean, got String (line 1)'
   end
 
   it 'compiles examples/fib.rb' do

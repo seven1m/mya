@@ -62,21 +62,27 @@ class Compiler
               (target_resolved.respond_to?(:name) && target_resolved.name != source_resolved.name)
           case @context
           when :if_condition
-            raise TypeClash, "`if` condition must be Boolean, got #{source_resolved}"
+            line_info = @context_data[:line] ? " (line #{@context_data[:line]})" : ''
+            raise TypeClash, "`if` condition must be Boolean, got #{source_resolved}#{line_info}"
           when :while_condition
-            raise TypeClash, "`while` condition must be Boolean, got #{source_resolved}"
+            line_info = @context_data[:line] ? " (line #{@context_data[:line]})" : ''
+            raise TypeClash, "`while` condition must be Boolean, got #{source_resolved}#{line_info}"
           when :if_branches
-            raise TypeClash, "one branch of `if` has type #{target_resolved} and the other has type #{source_resolved}"
+            line_info = @context_data[:line] ? " (line #{@context_data[:line]})" : ''
+            raise TypeClash,
+                  "one branch of `if` has type #{target_resolved} and the other has type #{source_resolved}#{line_info}"
           when :variable_reassignment
             var_name = @context_data[:variable_name]
+            line_info = @context_data[:line] ? " (line #{@context_data[:line]})" : ''
             raise TypeClash,
-                  "the variable `#{var_name}` has type #{target_resolved} already; you cannot change it to type #{source_resolved}"
+                  "the variable `#{var_name}` has type #{target_resolved} already; you cannot change it to type #{source_resolved}#{line_info}"
           when :method_argument
             method_name = @context_data[:method_name]
             receiver_type = @context_data[:receiver_type]
             arg_index = @context_data[:arg_index]
+            line_info = @context_data[:line] ? " (line #{@context_data[:line]})" : ''
             raise TypeClash,
-                  "#{receiver_type}##{method_name} argument #{arg_index} has type #{target_resolved}, but you passed #{source_resolved}"
+                  "#{receiver_type}##{method_name} argument #{arg_index} has type #{target_resolved}, but you passed #{source_resolved}#{line_info}"
           else
             raise TypeClash, "cannot constrain #{target_resolved} to #{source_resolved}"
           end
@@ -108,13 +114,15 @@ class Compiler
     end
 
     class TypeVariable < Type
-      def initialize(type_checker)
+      def initialize(type_checker, context: nil, context_data: {})
         @type_checker = type_checker
         @id = @type_checker.next_variable_id
+        @context = context
+        @context_data = context_data
         @type_checker.register_type_variable(self)
       end
 
-      attr_accessor :id, :instance
+      attr_accessor :id, :instance, :context, :context_data
 
       def name
         @name ||= @type_checker.next_variable_name
@@ -383,8 +391,20 @@ class Compiler
       @type_variables.each do |type_var|
         resolved = type_var.resolve!
         if resolved.is_a?(TypeVariable)
-          raise TypeError, "Not enough information to infer type of type variable '#{type_var.name}'"
+          error_message = generate_type_error_message(type_var)
+          raise TypeError, error_message
         end
+      end
+    end
+
+    def generate_type_error_message(type_var)
+      if type_var.context == :method_parameter
+        method_name = type_var.context_data[:method_name]
+        param_name = type_var.context_data[:param_name]
+        line = type_var.context_data[:line]
+        "Not enough information to infer type of parameter `#{param_name}` for method `#{method_name}` (line #{line})"
+      else
+        "Not enough information to infer type of type variable '#{type_var.name}'"
       end
     end
 
@@ -450,7 +470,15 @@ class Compiler
           if instruction.type_annotations && (type_name = instruction.type_annotations[param_name])
             resolve_type_from_name(type_name)
           else
-            TypeVariable.new(self)
+            TypeVariable.new(
+              self,
+              context: :method_parameter,
+              context_data: {
+                method_name: instruction.name,
+                param_name: param_name,
+                line: instruction.line,
+              },
+            )
           end
         end
 
@@ -476,15 +504,21 @@ class Compiler
 
     def analyze_if(instruction)
       condition_type = @stack.pop
-      add_constraint(Constraint.new(BoolType, condition_type, context: :if_condition))
+      add_constraint(
+        Constraint.new(BoolType, condition_type, context: :if_condition, context_data: { line: instruction.line }),
+      )
 
       if_true_type = analyze_array_of_instructions(instruction.if_true)
       if_false_type = analyze_array_of_instructions(instruction.if_false)
 
       if instruction.used
         result_type = TypeVariable.new(self)
-        add_constraint(Constraint.new(result_type, if_true_type, context: :if_branches))
-        add_constraint(Constraint.new(result_type, if_false_type, context: :if_branches))
+        add_constraint(
+          Constraint.new(result_type, if_true_type, context: :if_branches, context_data: { line: instruction.line }),
+        )
+        add_constraint(
+          Constraint.new(result_type, if_false_type, context: :if_branches, context_data: { line: instruction.line }),
+        )
         instruction.type = result_type
         @stack << result_type
       else
@@ -628,7 +662,9 @@ class Compiler
 
     def analyze_while(instruction)
       condition_type = analyze_array_of_instructions(instruction.condition)
-      add_constraint(Constraint.new(BoolType, condition_type, context: :while_condition))
+      add_constraint(
+        Constraint.new(BoolType, condition_type, context: :while_condition, context_data: { line: instruction.line }),
+      )
 
       analyze_array_of_instructions(instruction.body)
 
