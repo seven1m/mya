@@ -116,6 +116,13 @@ class Compiler
         else_block = function.basic_blocks.append
         result_block = function.basic_blocks.append
         condition = @stack.pop
+
+        # Convert Option types to boolean for conditionals
+        if condition.type == RcBuilder.pointer_type
+          # Option type: check if it's not null (Some vs None)
+          condition = builder.icmp(:ne, condition, RcBuilder.pointer_type.null_pointer)
+        end
+
         builder.cond(condition, then_block, else_block)
         then_block.build do |then_builder|
           build_instructions(function, then_builder, instruction.if_true) do |value|
@@ -237,6 +244,9 @@ class Compiler
           LLVM::Int1.type
         when 'Integer'
           LLVM::Int32.type
+        when 'Option'
+          # Option types are represented as pointers (null for None, non-null for Some)
+          RcBuilder.pointer_type
         else
           RcBuilder.pointer_type
         end
@@ -296,6 +306,15 @@ class Compiler
         @fn_int_to_string ||= @module.functions.add('int_to_string', [LLVM::Int32], RcBuilder.pointer_type)
       end
 
+      def fn_string_concat
+        @fn_string_concat ||=
+          @module.functions.add(
+            'string_concat',
+            [RcBuilder.pointer_type, RcBuilder.pointer_type],
+            RcBuilder.pointer_type,
+          )
+      end
+
       def build_methods
         {
           Array: {
@@ -326,9 +345,7 @@ class Compiler
             to_s: ->(builder:, args:, **) { builder.call(fn_int_to_string, args.first) },
           },
           String: {
-            '+': ->(builder:, args:, **) do
-              raise NotImplementedError, 'String concatenation not yet implemented in LLVM backend'
-            end,
+            '+': ->(builder:, args:, **) { builder.call(fn_string_concat, *args) },
             '==': ->(builder:, args:, **) do
               raise NotImplementedError, 'String comparison not yet implemented in LLVM backend'
             end,
@@ -337,6 +354,21 @@ class Compiler
             puts: ->(builder:, args:, **) do
               arg = args[1]
               builder.call(fn_puts, arg)
+            end,
+          },
+          Option: {
+            value: ->(builder:, args:, **) do
+              # For Option types, the value is the pointer itself (when not null)
+              # This assumes the Option is Some(value), not None
+              args.first
+            end,
+            is_some: ->(builder:, args:, **) do
+              # Check if the Option pointer is not null
+              builder.icmp(:ne, args.first, RcBuilder.pointer_type.null_pointer)
+            end,
+            is_none: ->(builder:, args:, **) do
+              # Check if the Option pointer is null
+              builder.icmp(:eq, args.first, RcBuilder.pointer_type.null_pointer)
             end,
           },
         }

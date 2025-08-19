@@ -31,6 +31,30 @@ class VM
     end
   end
 
+  class OptionType
+    def initialize(value)
+      @value = value
+    end
+
+    attr_reader :value
+
+    def methods
+      {
+        value: [{ instruction: :push_option_value }],
+        is_some: [{ instruction: :push_option_is_some }],
+        is_none: [{ instruction: :push_option_is_none }],
+      }
+    end
+
+    def to_bool
+      !@value.nil?
+    end
+
+    def nil?
+      @value.nil?
+    end
+  end
+
   MainClass = ClassType.new('main')
   MainObject = ObjectType.new(MainClass)
 
@@ -82,11 +106,26 @@ class VM
 
     receiver = @stack.pop or raise(ArgumentError, 'No receiver')
     name = instruction.name
+
+    if receiver.is_a?(OptionType)
+      case name
+      when :value
+        @stack << receiver.value
+        return
+      when :is_some
+        @stack << !receiver.nil?
+        return
+      when :is_none
+        @stack << receiver.nil?
+        return
+      end
+    end
+
     if receiver.respond_to?(name)
       @stack << receiver.send(name, *new_args)
       return
     end
-    if receiver.methods.key?(name)
+    if receiver.respond_to?(:methods) && receiver.methods.key?(name)
       push_frame(instructions: receiver.methods[name], return_index: @index, with_scope: true)
       @scope_stack << { args: new_args, vars: {}, self_obj: receiver }
       return
@@ -106,6 +145,9 @@ class VM
 
   def execute_if(instruction)
     condition = @stack.pop
+
+    condition = condition.to_bool if condition.is_a?(OptionType)
+
     body = condition ? instruction.if_true : instruction.if_false
     push_frame(instructions: body, return_index: @index)
   end
@@ -114,6 +156,8 @@ class VM
     loop do
       condition_frame = { instructions: instruction.condition, return_index: nil, with_scope: false }
       condition_result = execute_frames([condition_frame])
+
+      condition_result = condition_result.to_bool if condition_result.is_a?(OptionType)
 
       break unless condition_result
 
@@ -162,7 +206,13 @@ class VM
   end
 
   def execute_push_arg(instruction)
-    @stack << args.fetch(instruction.index)
+    arg = args.fetch(instruction.index)
+
+    if instruction.type!.name == :Option
+      arg = OptionType.new(arg) unless arg.is_a?(OptionType)
+    end
+
+    @stack << arg
   end
 
   def execute_push_array(instruction)
@@ -199,11 +249,23 @@ class VM
   end
 
   def execute_push_var(instruction)
-    @stack << vars.fetch(instruction.name)
+    var = vars.fetch(instruction.name)
+
+    if instruction.type!.name == :Option
+      var = OptionType.new(var) unless var.is_a?(OptionType)
+    end
+
+    @stack << var
   end
 
   def execute_set_var(instruction)
-    vars[instruction.name] = @stack.pop
+    value = @stack.pop
+
+    if instruction.type!.name == :Option
+      value = OptionType.new(value) unless value.is_a?(OptionType)
+    end
+
+    vars[instruction.name] = value
   end
 
   def execute_set_ivar(instruction)

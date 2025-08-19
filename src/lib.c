@@ -91,3 +91,24 @@ RC *int_to_string(int32_t value) {
 
     return rc;
 }
+
+RC *string_concat(const RC *left, const RC *right) {
+    const char *left_str = left->ptr;
+    const char *right_str = right->ptr;
+
+    size_t left_len = strlen(left_str);
+    size_t right_len = strlen(right_str);
+    size_t total_len = left_len + right_len;
+
+    RC *result = malloc(sizeof(RC));
+    result->ref_count = 1;
+    result->size = total_len;
+
+    char *new_str = malloc(total_len + 1);
+    strcpy(new_str, left_str);
+    strcat(new_str, right_str);
+
+    result->ptr = new_str;
+
+    return result;
+}

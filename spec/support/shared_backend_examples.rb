@@ -279,6 +279,53 @@ module SharedBackendExamples
         result = execute_file(File.expand_path('../../examples/countdown.rb', __dir__))
         expect(result).must_equal("5\n4\n3\n2\n1\nDone!\n")
       end
+
+      it 'evaluates Option types with nil' do
+        code = <<~CODE
+          def maybe_greet(name) # name:Option[String]
+            if name
+              "Hello, " + name.value
+            else
+              "No name provided"
+            end
+          end
+
+          maybe_greet(nil)
+        CODE
+        expect(execute(code)).must_equal('No name provided')
+      end
+
+      it 'evaluates Option types with values' do
+        code = <<~CODE
+          def maybe_greet(name) # name:Option[String]
+            if name
+              "Hello, " + name.value
+            else
+              "No name provided"
+            end
+          end
+
+          maybe_greet("Tim")
+        CODE
+        expect(execute(code)).must_equal('Hello, Tim')
+      end
+
+      it 'evaluates Option types in conditional expressions' do
+        code = <<~CODE
+          def process_optional(value) # value:Option[String]
+            if value
+              value.value + " processed"
+            else
+              "nothing to process"
+            end
+          end
+
+          a = process_optional("data")
+          b = process_optional(nil)
+          a + " | " + b
+        CODE
+        expect(execute(code)).must_equal('data processed | nothing to process')
+      end
     end
   end
 end
