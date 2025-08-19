@@ -74,15 +74,20 @@ RC *array_push_pointer(RC *rc, RC *value) {
     return rc;
 }
 
-int32_t puts_int(int32_t i) {
-    return printf("%d\n", i);
-}
-
-int32_t puts_str(const RC *rc) {
+int32_t puts_string(const RC *rc) {
     const char *str = rc->ptr;
     return printf("%s\n", str);
 }
 
-int32_t puts_bool(int8_t b) {
-    return printf("%s\n", b ? "true" : "false");
+RC *int_to_string(int32_t value) {
+    RC *rc = malloc(sizeof(RC));
+    rc->ref_count = 1;
+
+    char *str = malloc(12);
+    int len = snprintf(str, 12, "%d", value);
+
+    rc->ptr = str;
+    rc->size = len;
+
+    return rc;
 }

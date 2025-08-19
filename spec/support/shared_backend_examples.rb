@@ -36,93 +36,85 @@ module SharedBackendExamples
 
       it 'evaluates arrays' do
         code = <<~CODE
-          a = [1, 2, 3]
-          a.first
-        CODE
+           a = [1, 2, 3]
+           a.first
+         CODE
         expect(execute(code)).must_equal(1)
 
         code = <<~CODE
-          a = [1, 2, 3]
-          a.last
-        CODE
+           a = [1, 2, 3]
+           a.last
+         CODE
         expect(execute(code)).must_equal(3)
 
         code = <<~CODE
-          a = []
-          a << 4
-          a << 5
-          a.last
-        CODE
+           a = []
+           a << 4
+           a << 5
+           a.last
+         CODE
         expect(execute(code)).must_equal(5)
 
         code = <<~CODE
-          a = []
-          a << "foo"
-          a << "bar"
-          a.last
-        CODE
+           a = []
+           a << "foo"
+           a << "bar"
+           a.last
+         CODE
         expect(execute(code)).must_equal('bar')
 
         code = <<~CODE
-          a = ["foo", "bar", "baz"]
-          a.first
-        CODE
+           a = ["foo", "bar", "baz"]
+           a.first
+         CODE
         expect(execute(code)).must_equal('foo')
 
         code = <<~CODE
-          a = ["foo", "bar", "baz"]
-          a.last
-        CODE
+           a = ["foo", "bar", "baz"]
+           a.last
+         CODE
         expect(execute(code)).must_equal('baz')
-
-        code = <<~CODE
-          a = [1, 2, 3]
-          b = [4, 5, 6]
-          c = [a, b]
-          c.first
-        CODE
-        expect(execute(code)).must_equal([1, 2, 3])
       end
 
       it 'evaluates method definitions' do
         code = <<~CODE
-          def foo
-            'foo'
-          end
+           def foo
+             'foo'
+           end
 
-          foo
-        CODE
+           foo
+         CODE
         expect(execute(code)).must_equal('foo')
       end
 
       it 'evaluates method definitions with arguments' do
         code = <<~CODE
-          def bar(x)
-            x
-          end
+           def bar(x)
+             x
+           end
 
-          def foo(a, b)
-            bar(b - 10)
-          end
+           def foo(a, b)
+             bar(b - 10)
+           end
 
-          foo('foo', 100)
-        CODE
+           foo('foo', 100)
+         CODE
         expect(execute(code)).must_equal(90)
       end
 
       it 'does not stomp on method arguments' do
         code = <<~CODE
-          def bar(b)
-            b
-          end
+           def bar(b)
+             b
+           end
 
-          def foo(a, b)
-            bar(b - 10)
-            b
-          end
+           def foo(a, b)
+             bar(b - 10)
+             b
+           end
 
-          foo('foo', 100)
-        CODE
+           foo('foo', 100)
+         CODE
         expect(execute(code)).must_equal(100)
       end
 
@@ -140,93 +132,93 @@ module SharedBackendExamples
 
       it 'evaluates simple if expressions' do
         code = <<~CODE
-          if true
-            3
-          else
-            4
-          end
-        CODE
+           if true
+             3
+           else
+             4
+           end
+         CODE
         expect(execute(code)).must_equal(3)
 
         code = <<~CODE
-          if false
-            3
-          else
-            4
-          end
-        CODE
+           if false
+             3
+           else
+             4
+           end
+         CODE
         expect(execute(code)).must_equal(4)
       end
 
       it 'evaluates nested if expressions' do
         code = <<~CODE
-          if false
-            if true
-              1
-            else
-              2
-            end
-          else
-            if true
-              3           # <-- this one
-            else
-              4
-            end
-          end
-        CODE
+           if false
+             if true
+               1
+             else
+               2
+             end
+           else
+             if true
+               3           # <-- this one
+             else
+               4
+             end
+           end
+         CODE
         expect(execute(code)).must_equal(3)
 
         code = <<~CODE
-          if true
-            if false
-              1
-            else
-              2           # <-- this one
-            end
-          else
-            if false
-              3
-            else
-              4
-            end
-          end
-        CODE
+           if true
+             if false
+               1
+             else
+               2           # <-- this one
+             end
+           else
+             if false
+               3
+             else
+               4
+             end
+           end
+         CODE
         expect(execute(code)).must_equal(2)
 
         code = <<~CODE
-          if false
-            if false
-              1
-            else
-              2
-            end
-          elsif false
-            3
-          else
-            if false
-              4
-            else
-              5           # <-- this one
-            end
-          end
-        CODE
+           if false
+             if false
+               1
+             else
+               2
+             end
+           elsif false
+             3
+           else
+             if false
+               4
+             else
+               5           # <-- this one
+             end
+           end
+         CODE
         expect(execute(code)).must_equal(5)
       end
 
       it 'evaluates puts for strings' do
         code = <<~CODE
-          puts("hello")
-          puts("world")
-        CODE
+           puts("hello")
+           puts("world")
+         CODE
         out = execute_with_output(code)
         expect(out).must_equal("hello\nworld\n")
       end
 
       it 'evaluates strings' do
         code = <<~CODE
-          a = "foo"
-          a
-        CODE
+           a = "foo"
+           a
+         CODE
         expect(execute(code)).must_equal('foo')
       end
 

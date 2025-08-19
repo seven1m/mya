@@ -164,7 +164,9 @@ class Compiler
         method_type = receiver_resolved.get_method_type(@method_name)
         return false unless method_type
 
-        @instruction.type = method_type
+        # Store the full method type separately and set the return type as the main type
+        @instruction.method_type = method_type
+        @instruction.type = method_type.return_type
 
         expected_count = method_type.param_types.length
         actual_count = @arg_types.length
@@ -230,6 +232,10 @@ class Compiler
 
       def define_method_type(name, method_type)
         @methods[name] = method_type
+      end
+
+      def each_instance_variable(&block)
+        @instance_variables.each(&block)
       end
 
       def get_instance_variable(name)
@@ -433,7 +439,7 @@ class Compiler
     def analyze_class(instruction)
       class_type = ClassType.new(instruction.name.to_s)
 
-      @classes[instruction.name] = class_type
+      @classes[instruction.name.to_sym] = class_type
 
       new_method_type = MethodType.new(name: :new, self_type: class_type, param_types: [], return_type: class_type)
       class_type.define_method_type(:new, new_method_type)
@@ -676,7 +682,9 @@ class Compiler
       validate_argument_count(instruction.name, method_type.param_types.length, instruction.arg_count)
       create_argument_constraints(method_type, arg_types, instruction.name, receiver_type)
       add_constraint(Constraint.new(result_type, method_type.return_type))
-      instruction.type = method_type
+      # Store the full method type separately and set the return type as the main type
+      instruction.method_type = method_type
+      instruction.type = method_type.return_type
     end
 
     def handle_unknown_method_call(instruction, receiver_type, arg_types, result_type)

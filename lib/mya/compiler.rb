@@ -216,7 +216,6 @@ class Compiler
   def transform_while_node(node, used:)
     instruction = WhileInstruction.new(line: node.location.start_line)
 
-    # Transform condition
     instruction.condition = []
     with_instructions_array(instruction.condition) { transform(node.predicate, used: true) }
 

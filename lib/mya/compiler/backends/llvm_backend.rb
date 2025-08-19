@@ -54,7 +54,7 @@ class Compiler
         @entry = @module.functions.add('main', [], llvm_type(@return_type))
         build_function(@entry, @instructions)
         @lib.link_into(@module)
-        #@module.dump if @dump || !@module.valid?
+        @module.dump if @dump || !@module.valid?
         @module.verify!
       end
 
@@ -82,18 +82,17 @@ class Compiler
       def build_call(instruction, _function, builder)
         args = @stack.pop(instruction.arg_count)
         receiver = @stack.pop
-        receiver_type = instruction.type!.types.first
+        receiver_type = instruction.method_type.self_type
         args.unshift(receiver)
         name = instruction.name
-        fn = @methods.dig(receiver_type.name_for_method_lookup, name) or
-          raise(NoMethodError, "Method '#{name}' not found")
+        fn = @methods.dig(receiver_type.name.to_sym, name.to_sym) or raise(NoMethodError, "Method '#{name}' not found")
         fn.respond_to?(:call) ? @stack << fn.call(builder:, instruction:, args:) : @stack << builder.call(fn, *args)
       end
 
       def build_class(instruction, function, builder)
         name = instruction.name
-        attr_types = instruction.type!.attributes.values.map { |t| llvm_type(t) }
-        klass = @classes[name] = LLVM.Struct(*attr_types, name.to_s)
+        attr_types = instruction.type!.each_instance_variable.map { |_, t| llvm_type(t) }
+        klass = @classes[name.to_sym] = LLVM.Struct(*attr_types, name.to_s)
         @methods[name.to_sym] = { new: method(:build_call_new) }
         @scope_stack << { function:, vars: {}, self_obj: klass }
         build_instructions(function, builder, instruction.body)
@@ -105,10 +104,9 @@ class Compiler
         param_types = (0...instruction.params.size).map { |i| llvm_type(instruction.body.fetch(i * 2).type!) }
         receiver_type = instruction.receiver_type
         param_types.unshift(llvm_type(receiver_type))
-        return_type = llvm_type(instruction.return_type)
-        @methods[receiver_type.name_for_method_lookup] ||= {}
-        @methods[receiver_type.name_for_method_lookup][name] = fn =
-          @module.functions.add(name, param_types, return_type)
+        return_type = llvm_type(instruction.return_type.resolve!)
+        @methods[receiver_type.name.to_sym] ||= {}
+        @methods[receiver_type.name.to_sym][name.to_sym] = fn = @module.functions.add(name, param_types, return_type)
         build_function(fn, instruction.body)
       end
 
@@ -206,10 +204,10 @@ class Compiler
       end
 
       def llvm_type(type)
-        case type.evaluated_type.to_sym
-        when :bool
+        case type.name
+        when 'Boolean'
           LLVM::Int1.type
-        when :int
+        when 'Integer'
           LLVM::Int32.type
         else
           RcBuilder.pointer_type
@@ -217,12 +215,10 @@ class Compiler
       end
 
       def llvm_type_to_ruby(value, type)
-        type = type.types.last if type.is_a?(Compiler::CallType)
-
-        case type.to_sym
-        when :bool, :int, :nil
+        case type.name
+        when 'Boolean', 'Integer', 'NilClass'
           read_llvm_type_as_ruby(value, type)
-        when :str
+        when 'String'
           ptr = read_rc_pointer(value)
           read_llvm_type_as_ruby(ptr, type)
         else
@@ -237,14 +233,14 @@ class Compiler
       end
 
       def read_llvm_type_as_ruby(value, type)
-        case type.to_sym
-        when :bool
+        case type.name
+        when 'Boolean'
           value.to_i == -1
-        when :int
+        when 'Integer'
           value.to_i
-        when :str
+        when 'String'
           value.read_string
-        when :nil
+        when 'NilClass'
           nil
         else
           raise "Unknown type: #{type.inspect}"
@@ -259,26 +255,22 @@ class Compiler
       def build_array(builder, instruction)
         elements = @stack.pop(instruction.size)
         array_type = instruction.type!
-        element_type = llvm_type(array_type.types.first)
+        element_type = llvm_type(array_type.element_type)
         array = ArrayBuilder.new(builder:, mod: @module, element_type:, elements:)
         array.to_ptr
       end
 
-      def fn_puts_int
-        @fn_puts_int ||= @module.functions.add('puts_int', [LLVM::Int32], LLVM::Int32)
+      def fn_puts
+        @fn_puts ||= @module.functions.add('puts_string', [RcBuilder.pointer_type], LLVM::Int32)
       end
 
-      def fn_puts_str
-        @fn_puts_str ||= @module.functions.add('puts_str', [RcBuilder.pointer_type], LLVM::Int32)
-      end
-
-      def fn_puts_bool
-        @fn_puts_bool ||= @module.functions.add('puts_bool', [LLVM::Int1], LLVM::Int32)
+      def fn_int_to_string
+        @fn_int_to_string ||= @module.functions.add('int_to_string', [LLVM::Int32], RcBuilder.pointer_type)
       end
 
       def build_methods
         {
-          array: {
+          Array: {
             first: ->(builder:, instruction:, args:) do
               element_type = llvm_type(instruction.type!)
               array = ArrayBuilder.new(ptr: args.first, builder:, mod: @module, element_type:)
@@ -295,28 +287,27 @@ class Compiler
               array.push(args.last)
             end,
           },
-          int: {
+          Integer: {
             '+': ->(builder:, args:, **) { builder.add(*args) },
             '-': ->(builder:, args:, **) { builder.sub(*args) },
             '*': ->(builder:, args:, **) { builder.mul(*args) },
             '/': ->(builder:, args:, **) { builder.sdiv(*args) },
             '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
             '<': ->(builder:, args:, **) { builder.icmp(:slt, *args) },
+            to_s: ->(builder:, args:, **) { builder.call(fn_int_to_string, args.first) },
           },
-          '(object main)': {
-            puts: ->(builder:, args:, instruction:) do
-              arg = args[1] # receiver is arg 0
-              arg_type = instruction.type!.types[1].to_sym
-              case arg_type
-              when :int
-                builder.call(fn_puts_int, arg)
-              when :str
-                builder.call(fn_puts_str, arg)
-              when :bool
-                builder.call(fn_puts_bool, arg)
-              else
-                raise NoMethodError, "Method 'puts' for type #{arg_type.inspect} not found"
-              end
+          String: {
+            '+': ->(builder:, args:, **) do
+              raise NotImplementedError, 'String concatenation not yet implemented in LLVM backend'
+            end,
+            '==': ->(builder:, args:, **) do
+              raise NotImplementedError, 'String comparison not yet implemented in LLVM backend'
+            end,
+          },
+          Object: {
+            puts: ->(builder:, args:, **) do
+              arg = args[1]
+              builder.call(fn_puts, arg)
             end,
           },
         }

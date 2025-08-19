@@ -181,11 +181,14 @@ class Compiler
     end
 
     attr_reader :name, :arg_count
+    attr_accessor :method_type
 
     def instruction_name = :call
 
     def to_h
-      super.merge(name:, arg_count:)
+      result = super.merge(name:, arg_count:)
+      result[:method_type] = @method_type.to_s if @method_type
+      result
     end
   end
 
@@ -222,8 +225,8 @@ class Compiler
 
     def instruction_name = :def
 
-    def receiver_type = type!.types.first
-    def return_type = type!.types.last
+    def receiver_type = type!.self_type
+    def return_type = type!.return_type
 
     def to_h
       super.merge(name:, params:, body: body.map(&:to_h))
