@@ -208,6 +208,115 @@ describe Compiler do
     expect(e.message).must_equal 'method foo expects 1 argument, got 2'
   end
 
+  it 'compiles recursive method definitions' do
+    code = <<~CODE
+      def foo(a) # a:Integer
+        if true
+          1
+        else
+          2 + a
+        end
+      end
+
+      foo(5)
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Object#foo(Integer) => Integer',
+                               instruction: :def,
+                               name: :foo,
+                               params: [:a],
+                               body: [
+                                 { type: 'Integer', instruction: :push_arg, index: 0 },
+                                 { type: 'Integer', instruction: :set_var, name: :a },
+                                 { type: 'Boolean', instruction: :push_true },
+                                 {
+                                   type: 'Integer',
+                                   instruction: :if,
+                                   if_true: [{ type: 'Integer', instruction: :push_int, value: 1 }],
+                                   if_false: [
+                                     { type: 'Integer', instruction: :push_int, value: 2 },
+                                     { type: 'Integer', instruction: :push_var, name: :a },
+                                     {
+                                       type: 'Integer#+(Integer) => Integer',
+                                       instruction: :call,
+                                       name: :+,
+                                       arg_count: 1,
+                                     },
+                                   ],
+                                 },
+                               ],
+                             },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'Integer', instruction: :push_int, value: 5 },
+                             { type: 'Object#foo(Integer) => Integer', instruction: :call, name: :foo, arg_count: 1 },
+                           ]
+  end
+
+  it 'compiles truly recursive method definitions' do
+    code = <<~CODE
+      def countdown(n) # n:Integer
+        if n == 0
+          0
+        else
+          countdown(n - 1)
+        end
+      end
+
+      countdown(3)
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Object#countdown(Integer) => Integer',
+                               instruction: :def,
+                               name: :countdown,
+                               params: [:n],
+                               body: [
+                                 { type: 'Integer', instruction: :push_arg, index: 0 },
+                                 { type: 'Integer', instruction: :set_var, name: :n },
+                                 { type: 'Integer', instruction: :push_var, name: :n },
+                                 { type: 'Integer', instruction: :push_int, value: 0 },
+                                 {
+                                   type: 'Integer#==(Integer) => Boolean',
+                                   instruction: :call,
+                                   name: :==,
+                                   arg_count: 1,
+                                 },
+                                 {
+                                   type: 'Integer',
+                                   instruction: :if,
+                                   if_true: [{ type: 'Integer', instruction: :push_int, value: 0 }],
+                                   if_false: [
+                                     { type: 'Object', instruction: :push_self },
+                                     { type: 'Integer', instruction: :push_var, name: :n },
+                                     { type: 'Integer', instruction: :push_int, value: 1 },
+                                     {
+                                       type: 'Integer#-(Integer) => Integer',
+                                       instruction: :call,
+                                       name: :-,
+                                       arg_count: 1,
+                                     },
+                                     {
+                                       type: 'Object#countdown(Integer) => Integer',
+                                       instruction: :call,
+                                       name: :countdown,
+                                       arg_count: 1,
+                                     },
+                                   ],
+                                 },
+                               ],
+                             },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'Integer', instruction: :push_int, value: 3 },
+                             {
+                               type: 'Object#countdown(Integer) => Integer',
+                               instruction: :call,
+                               name: :countdown,
+                               arg_count: 1,
+                             },
+                           ]
+  end
+
   it 'compiles operator expressions' do
     code = <<~CODE
       def num(a) = a
@@ -637,117 +746,159 @@ describe Compiler do
     expect(e.message).must_equal '`while` condition must be Boolean, got String'
   end
 
-  # it 'compiles examples/fib.rb' do
-  #   code = File.read(File.expand_path('../examples/fib.rb', __dir__))
-  #   expect(compile(code)).must_equal_with_diff [
-  #                            {
-  #                              type: '([(object main), int] -> int)',
-  #                              instruction: :def,
-  #                              name: :fib,
-  #                              params: [:n],
-  #                              body: [
-  #                                { type: 'Integer', instruction: :push_arg, index: 0 },
-  #                                { type: 'Integer', instruction: :set_var, name: :n },
-  #                                { type: 'Integer', instruction: :push_var, name: :n },
-  #                                { type: 'Integer', instruction: :push_int, value: 0 },
-  #                                { type: 'Boolean', instruction: :call, name: :==, arg_count: 1 },
-  #                                {
-  #                                  type: 'Integer',
-  #                                  instruction: :if,
-  #                                  if_true: [{ type: 'Integer', instruction: :push_int, value: 0 }],
-  #                                  if_false: [
-  #                                    { type: 'Integer', instruction: :push_var, name: :n },
-  #                                    { type: 'Integer', instruction: :push_int, value: 1 },
-  #                                    { type: 'Boolean', instruction: :call, name: :==, arg_count: 1 },
-  #                                    {
-  #                                      type: 'Integer',
-  #                                      instruction: :if,
-  #                                      if_true: [{ type: 'Integer', instruction: :push_int, value: 1 }],
-  #                                      if_false: [
-  #                                        { type: '(object main)', instruction: :push_self },
-  #                                        { type: 'Integer', instruction: :push_var, name: :n },
-  #                                        { type: 'Integer', instruction: :push_int, value: 1 },
-  #                                        { type: 'Integer', instruction: :call, name: :-, arg_count: 1 },
-  #                                        {
-  #                                          type: 'Integer',
-  #                                          instruction: :call,
-  #                                          name: :fib,
-  #                                          arg_count: 1,
-  #                                        },
-  #                                        { type: '(object main)', instruction: :push_self },
-  #                                        { type: 'Integer', instruction: :push_var, name: :n },
-  #                                        { type: 'Integer', instruction: :push_int, value: 2 },
-  #                                        { type: 'Integer', instruction: :call, name: :-, arg_count: 1 },
-  #                                        {
-  #                                          type: 'Integer',
-  #                                          instruction: :call,
-  #                                          name: :fib,
-  #                                          arg_count: 1,
-  #                                        },
-  #                                        { type: 'Integer', instruction: :call, name: :+, arg_count: 1 },
-  #                                      ],
-  #                                    },
-  #                                  ],
-  #                                },
-  #                              ],
-  #                            },
-  #                            { type: '(object main)', instruction: :push_self },
-  #                            { type: '(object main)', instruction: :push_self },
-  #                            { type: 'Integer', instruction: :push_int, value: 10 },
-  #                            { type: 'Integer', instruction: :call, name: :fib, arg_count: 1 },
-  #                            { type: 'Integer', instruction: :call, name: :puts, arg_count: 1 },
-  #                          ]
-  # end
-  #
-  # it 'compiles examples/fact.rb' do
-  #   code = File.read(File.expand_path('../examples/fact.rb', __dir__))
-  #   expect(compile(code)).must_equal_with_diff [
-  #                            {
-  #                              type: '([(object main), int, int] -> int)',
-  #                              instruction: :def,
-  #                              name: :fact,
-  #                              params: %i[n result],
-  #                              body: [
-  #                                { type: 'Integer', instruction: :push_arg, index: 0 },
-  #                                { type: 'Integer', instruction: :set_var, name: :n },
-  #                                { type: 'Integer', instruction: :push_arg, index: 1 },
-  #                                { type: 'Integer', instruction: :set_var, name: :result },
-  #                                { type: 'Integer', instruction: :push_var, name: :n },
-  #                                { type: 'Integer', instruction: :push_int, value: 0 },
-  #                                { type: 'Boolean', instruction: :call, name: :==, arg_count: 1 },
-  #                                {
-  #                                  type: 'Integer',
-  #                                  instruction: :if,
-  #                                  if_true: [{ type: 'Integer', instruction: :push_var, name: :result }],
-  #                                  if_false: [
-  #                                    { type: '(object main)', instruction: :push_self },
-  #                                    { type: 'Integer', instruction: :push_var, name: :n },
-  #                                    { type: 'Integer', instruction: :push_int, value: 1 },
-  #                                    { type: 'Integer', instruction: :call, name: :-, arg_count: 1 },
-  #                                    { type: 'Integer', instruction: :push_var, name: :result },
-  #                                    { type: 'Integer', instruction: :push_var, name: :n },
-  #                                    { type: 'Integer', instruction: :call, name: :*, arg_count: 1 },
-  #                                    {
-  #                                      type: 'Integer',
-  #                                      instruction: :call,
-  #                                      name: :fact,
-  #                                      arg_count: 2,
-  #                                    },
-  #                                  ],
-  #                                },
-  #                              ],
-  #                            },
-  #                            { type: '(object main)', instruction: :push_self },
-  #                            { type: '(object main)', instruction: :push_self },
-  #                            { type: 'Integer', instruction: :push_int, value: 10 },
-  #                            { type: 'Integer', instruction: :push_int, value: 1 },
-  #                            {
-  #                              type: 'Integer',
-  #                              instruction: :call,
-  #                              name: :fact,
-  #                              arg_count: 2,
-  #                            },
-  #                            { type: 'Integer', instruction: :call, name: :puts, arg_count: 1 },
-  #                          ]
-  # end
+  it 'compiles examples/fib.rb' do
+    code = File.read(File.expand_path('../examples/fib.rb', __dir__))
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Object#fib(Integer) => Integer',
+                               instruction: :def,
+                               name: :fib,
+                               params: [:n],
+                               body: [
+                                 { type: 'Integer', instruction: :push_arg, index: 0 },
+                                 { type: 'Integer', instruction: :set_var, name: :n },
+                                 { type: 'Integer', instruction: :push_var, name: :n },
+                                 { type: 'Integer', instruction: :push_int, value: 0 },
+                                 {
+                                   type: 'Integer#==(Integer) => Boolean',
+                                   instruction: :call,
+                                   name: :==,
+                                   arg_count: 1,
+                                 },
+                                 {
+                                   type: 'Integer',
+                                   instruction: :if,
+                                   if_true: [{ type: 'Integer', instruction: :push_int, value: 0 }],
+                                   if_false: [
+                                     { type: 'Integer', instruction: :push_var, name: :n },
+                                     { type: 'Integer', instruction: :push_int, value: 1 },
+                                     {
+                                       type: 'Integer#==(Integer) => Boolean',
+                                       instruction: :call,
+                                       name: :==,
+                                       arg_count: 1,
+                                     },
+                                     {
+                                       type: 'Integer',
+                                       instruction: :if,
+                                       if_true: [{ type: 'Integer', instruction: :push_int, value: 1 }],
+                                       if_false: [
+                                         { type: 'Object', instruction: :push_self },
+                                         { type: 'Integer', instruction: :push_var, name: :n },
+                                         { type: 'Integer', instruction: :push_int, value: 1 },
+                                         {
+                                           type: 'Integer#-(Integer) => Integer',
+                                           instruction: :call,
+                                           name: :-,
+                                           arg_count: 1,
+                                         },
+                                         {
+                                           type: 'Object#fib(Integer) => Integer',
+                                           instruction: :call,
+                                           name: :fib,
+                                           arg_count: 1,
+                                         },
+                                         { type: 'Object', instruction: :push_self },
+                                         { type: 'Integer', instruction: :push_var, name: :n },
+                                         { type: 'Integer', instruction: :push_int, value: 2 },
+                                         {
+                                           type: 'Integer#-(Integer) => Integer',
+                                           instruction: :call,
+                                           name: :-,
+                                           arg_count: 1,
+                                         },
+                                         {
+                                           type: 'Object#fib(Integer) => Integer',
+                                           instruction: :call,
+                                           name: :fib,
+                                           arg_count: 1,
+                                         },
+                                         {
+                                           type: 'Integer#+(Integer) => Integer',
+                                           instruction: :call,
+                                           name: :+,
+                                           arg_count: 1,
+                                         },
+                                       ],
+                                     },
+                                   ],
+                                 },
+                               ],
+                             },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'Integer', instruction: :push_int, value: 10 },
+                             { type: 'Object#fib(Integer) => Integer', instruction: :call, name: :fib, arg_count: 1 },
+                             { type: 'Integer#to_s() => String', instruction: :call, name: :to_s, arg_count: 0 },
+                             { type: 'Object#puts(String) => Integer', instruction: :call, name: :puts, arg_count: 1 },
+                           ]
+  end
+
+  it 'compiles examples/fact.rb' do
+    code = File.read(File.expand_path('../examples/fact.rb', __dir__))
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Object#fact(Integer, Integer) => Integer',
+                               instruction: :def,
+                               name: :fact,
+                               params: %i[n result],
+                               body: [
+                                 { type: 'Integer', instruction: :push_arg, index: 0 },
+                                 { type: 'Integer', instruction: :set_var, name: :n },
+                                 { type: 'Integer', instruction: :push_arg, index: 1 },
+                                 { type: 'Integer', instruction: :set_var, name: :result },
+                                 { type: 'Integer', instruction: :push_var, name: :n },
+                                 { type: 'Integer', instruction: :push_int, value: 0 },
+                                 {
+                                   type: 'Integer#==(Integer) => Boolean',
+                                   instruction: :call,
+                                   name: :==,
+                                   arg_count: 1,
+                                 },
+                                 {
+                                   type: 'Integer',
+                                   instruction: :if,
+                                   if_true: [{ type: 'Integer', instruction: :push_var, name: :result }],
+                                   if_false: [
+                                     { type: 'Object', instruction: :push_self },
+                                     { type: 'Integer', instruction: :push_var, name: :n },
+                                     { type: 'Integer', instruction: :push_int, value: 1 },
+                                     {
+                                       type: 'Integer#-(Integer) => Integer',
+                                       instruction: :call,
+                                       name: :-,
+                                       arg_count: 1,
+                                     },
+                                     { type: 'Integer', instruction: :push_var, name: :result },
+                                     { type: 'Integer', instruction: :push_var, name: :n },
+                                     {
+                                       type: 'Integer#*(Integer) => Integer',
+                                       instruction: :call,
+                                       name: :*,
+                                       arg_count: 1,
+                                     },
+                                     {
+                                       type: 'Object#fact(Integer, Integer) => Integer',
+                                       instruction: :call,
+                                       name: :fact,
+                                       arg_count: 2,
+                                     },
+                                   ],
+                                 },
+                               ],
+                             },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'Integer', instruction: :push_int, value: 10 },
+                             { type: 'Integer', instruction: :push_int, value: 1 },
+                             {
+                               type: 'Object#fact(Integer, Integer) => Integer',
+                               instruction: :call,
+                               name: :fact,
+                               arg_count: 2,
+                             },
+                             { type: 'Integer#to_s() => String', instruction: :call, name: :to_s, arg_count: 0 },
+                             { type: 'Object#puts(String) => Integer', instruction: :call, name: :puts, arg_count: 1 },
+                           ]
+  end
 end
