@@ -383,7 +383,7 @@ class Compiler
       @type_variables.each do |type_var|
         resolved = type_var.resolve!
         if resolved.is_a?(TypeVariable)
-          raise TypeError, "Not enough information to infer type of variable '#{type_var.name}'"
+          raise TypeError, "Not enough information to infer type of type variable '#{type_var.name}'"
         end
       end
     end
@@ -751,8 +751,8 @@ class Compiler
       Option: {
         is_some: ->(self_type) { MethodType.new(self_type:, param_types: [], return_type: BoolType, name: :is_some) },
         is_none: ->(self_type) { MethodType.new(self_type:, param_types: [], return_type: BoolType, name: :is_none) },
-        value: ->(self_type) do
-          MethodType.new(self_type:, param_types: [], return_type: self_type.inner_type, name: :value)
+        value!: ->(self_type) do
+          MethodType.new(self_type:, param_types: [], return_type: self_type.inner_type, name: :value!)
         end,
         value_or: ->(self_type) do
           MethodType.new(

@@ -284,7 +284,7 @@ module SharedBackendExamples
         code = <<~CODE
           def maybe_greet(name) # name:Option[String]
             if name
-              "Hello, " + name.value
+              "Hello, " + name.value!
             else
               "No name provided"
             end
@@ -299,7 +299,7 @@ module SharedBackendExamples
         code = <<~CODE
           def maybe_greet(name) # name:Option[String]
             if name
-              "Hello, " + name.value
+              "Hello, " + name.value!
             else
               "No name provided"
             end
@@ -314,7 +314,7 @@ module SharedBackendExamples
         code = <<~CODE
           def process_optional(value) # value:Option[String]
             if value
-              value.value + " processed"
+              value.value! + " processed"
             else
               "nothing to process"
             end

@@ -40,7 +40,7 @@ class VM
 
     def methods
       {
-        value: [{ instruction: :push_option_value }],
+        value!: [{ instruction: :push_option_value }],
         is_some: [{ instruction: :push_option_is_some }],
         is_none: [{ instruction: :push_option_is_none }],
       }
@@ -109,7 +109,8 @@ class VM
 
     if receiver.is_a?(OptionType)
       case name
-      when :value
+      when :'value!'
+        raise RuntimeError, 'Cannot call value! on None option' if receiver.nil?
         @stack << receiver.value
         return
       when :is_some

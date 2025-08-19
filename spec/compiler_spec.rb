@@ -199,12 +199,12 @@ describe Compiler do
 
   it 'raises error for unknown method arg type' do
     code = <<~CODE
-       def foo(a)
-         a
+       def foo(x)
+         x
        end
      CODE
     e = expect { compile(code) }.must_raise TypeError
-    expect(e.message).must_equal("Not enough information to infer type of variable 'a'")
+    expect(e.message).must_equal("Not enough information to infer type of type variable 'a'")
   end
 
   # NOTE: we don't support monomorphization (yet!)
@@ -589,7 +589,7 @@ describe Compiler do
     code = <<~CODE
       def maybe_greet(name) # name:Option[String]
         if name
-          puts "Hello, " + name.value
+          puts "Hello, " + name.value!
         else
           0
         end
@@ -618,9 +618,9 @@ describe Compiler do
                                      {
                                        type: 'String',
                                        instruction: :call,
-                                       name: :value,
+                                       name: :'value!',
                                        arg_count: 0,
-                                       method_type: 'Option[String]#value() => String',
+                                       method_type: 'Option[String]#value!() => String',
                                      },
                                      {
                                        type: 'String',

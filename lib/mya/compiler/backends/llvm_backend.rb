@@ -357,7 +357,7 @@ class Compiler
             end,
           },
           Option: {
-            value: ->(builder:, args:, **) do
+            value!: ->(builder:, args:, **) do
               # For Option types, the value is the pointer itself (when not null)
               # This works for Option[String] since strings are already pointers
               # Note: Option[Integer] is not supported - integers are native types
