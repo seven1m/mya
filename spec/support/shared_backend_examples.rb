@@ -59,23 +59,19 @@ module SharedBackendExamples
         expect(execute('a = 1; a + a')).must_equal(2)
       end
 
-      it 'evaluates variables with Integer type annotation' do
+      it 'evaluates variables with type annotation' do
         code = <<~CODE
           x = 42 # x:Integer
           x + 8
         CODE
         expect(execute(code)).must_equal(50)
-      end
 
-      it 'evaluates variables with String type annotation' do
         code = <<~CODE
           name = "Alice" # name:String
           name + " Smith"
         CODE
         expect(execute(code)).must_equal('Alice Smith')
-      end
 
-      it 'evaluates variables with Option[String] type annotation' do
         code = <<~CODE
           message = "hello" # message:Option[String]
           if message

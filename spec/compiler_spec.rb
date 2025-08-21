@@ -197,7 +197,7 @@ describe Compiler do
                            ]
   end
 
-  it 'raises helpful error for unknown method parameter type' do
+  it 'raises error for unknown method parameter type' do
     code = <<~CODE
        def foo(x)
          x
@@ -1129,7 +1129,7 @@ describe Compiler do
                            ]
   end
 
-  it 'compiles variables with Integer type annotation' do
+  it 'compiles variables with type annotation' do
     code = <<~CODE
       x = 42 # x:Integer
       x
@@ -1139,9 +1139,7 @@ describe Compiler do
                              { type: 'Integer', instruction: :set_var, name: :x },
                              { type: 'Integer', instruction: :push_var, name: :x },
                            ]
-  end
 
-  it 'compiles variables with String type annotation' do
     code = <<~CODE
       name = "Alice" # name:String
       name
@@ -1150,6 +1148,16 @@ describe Compiler do
                              { type: 'String', instruction: :push_str, value: 'Alice' },
                              { type: 'String', instruction: :set_var, name: :name },
                              { type: 'String', instruction: :push_var, name: :name },
+                           ]
+
+    code = <<~CODE
+      message = "hello" # message:Option[String]
+      message
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'String', instruction: :push_str, value: 'hello' },
+                             { type: 'Option[String]', instruction: :set_var, name: :message },
+                             { type: 'Option[String]', instruction: :push_var, name: :message },
                            ]
   end
 
@@ -1160,17 +1168,5 @@ describe Compiler do
     CODE
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
     expect(e.message).must_include('cannot constrain Integer to String')
-  end
-
-  it 'compiles variables with Option[String] type annotation' do
-    code = <<~CODE
-      message = "hello" # message:Option[String]
-      message
-    CODE
-    expect(compile(code)).must_equal_with_diff [
-                             { type: 'String', instruction: :push_str, value: 'hello' },
-                             { type: 'Option[String]', instruction: :set_var, name: :message },
-                             { type: 'Option[String]', instruction: :push_var, name: :message },
-                           ]
   end
 end
