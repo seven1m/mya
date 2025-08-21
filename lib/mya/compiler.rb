@@ -36,9 +36,9 @@ class Compiler
 
   def parse_type_annotations(text)
     annotations = {}
-    # Match patterns like "a:Integer", "b:String", "c:Option[String]"
-    text.scan(/(\w+)\s*:\s*([A-Z]\w*(?:\[[A-Z]\w*\])?)/) do |param_name, type_spec|
-      annotations[param_name.to_sym] = parse_type_spec(type_spec)
+    # Match patterns like "a:Integer", "b:String", "c:Option[String]", "@name:String"
+    text.scan(/(@?\w+)\s*:\s*([A-Z]\w*(?:\[[A-Z]\w*\])?)/) do |var_name, type_spec|
+      annotations[var_name.to_sym] = parse_type_spec(type_spec)
     end
     annotations
   end
@@ -189,6 +189,12 @@ class Compiler
   def transform_local_variable_write_node(node, used:)
     transform(node.value, used: true)
     instruction = SetVarInstruction.new(node.name, line: node.location.start_line)
+
+    if (line_directives = @directives[node.location.start_line]) &&
+         (annotations = line_directives[:type_annotations]) && (type_annotation = annotations[node.name])
+      instruction.type_annotation = type_annotation
+    end
+
     @instructions << instruction
     @instructions << PushVarInstruction.new(node.name, line: node.location.start_line) if used
   end

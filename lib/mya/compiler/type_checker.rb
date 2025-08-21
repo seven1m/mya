@@ -656,8 +656,27 @@ class Compiler
 
     def analyze_set_var(instruction)
       value_type = @stack.pop
-      scope.set_var_type(instruction.name, value_type)
-      instruction.type = value_type
+
+      # If there's a type annotation, add a constraint but keep the actual value type
+      if instruction.type_annotation
+        annotated_type = resolve_type_from_name(instruction.type_annotation)
+        add_constraint(
+          Constraint.new(
+            annotated_type,
+            value_type,
+            context: :variable_type_annotation,
+            context_data: {
+              name: instruction.name,
+              line: instruction.line,
+            },
+          ),
+        )
+        scope.set_var_type(instruction.name, annotated_type)
+        instruction.type = annotated_type
+      else
+        scope.set_var_type(instruction.name, value_type)
+        instruction.type = value_type
+      end
     end
 
     def analyze_while(instruction)

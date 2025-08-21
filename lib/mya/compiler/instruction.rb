@@ -102,9 +102,11 @@ class Compiler
     def initialize(name, line:)
       super(line:)
       @name = name
+      @type_annotation = nil
     end
 
     attr_reader :name
+    attr_accessor :type_annotation
 
     def instruction_name = :set_var
 

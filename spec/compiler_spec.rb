@@ -1128,4 +1128,49 @@ describe Compiler do
                              },
                            ]
   end
+
+  it 'compiles variables with Integer type annotation' do
+    code = <<~CODE
+      x = 42 # x:Integer
+      x
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'Integer', instruction: :push_int, value: 42 },
+                             { type: 'Integer', instruction: :set_var, name: :x },
+                             { type: 'Integer', instruction: :push_var, name: :x },
+                           ]
+  end
+
+  it 'compiles variables with String type annotation' do
+    code = <<~CODE
+      name = "Alice" # name:String
+      name
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'String', instruction: :push_str, value: 'Alice' },
+                             { type: 'String', instruction: :set_var, name: :name },
+                             { type: 'String', instruction: :push_var, name: :name },
+                           ]
+  end
+
+  it 'raises error for variable type annotation mismatch' do
+    code = <<~CODE
+      x = "hello" # x:Integer
+      x
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_include('cannot constrain Integer to String')
+  end
+
+  it 'compiles variables with Option[String] type annotation' do
+    code = <<~CODE
+      message = "hello" # message:Option[String]
+      message
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'String', instruction: :push_str, value: 'hello' },
+                             { type: 'Option[String]', instruction: :set_var, name: :message },
+                             { type: 'Option[String]', instruction: :push_var, name: :message },
+                           ]
+  end
 end
