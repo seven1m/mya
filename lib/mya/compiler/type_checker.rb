@@ -229,7 +229,12 @@ class Compiler
       def get_method_type(method_name)
         return @methods[method_name] if @methods[method_name]
 
-        get_builtin_method_type(method_name, BUILTIN_METHODS[name.to_sym])
+        method_type = get_builtin_method_type(method_name, BUILTIN_METHODS[name.to_sym])
+        return method_type if method_type
+
+        # Fall back to Object methods
+        # FIXME: implement inheritance
+        get_builtin_method_type(method_name, BUILTIN_METHODS[:Object])
       end
 
       def define_method_type(name, method_type)
@@ -629,9 +634,7 @@ class Compiler
 
     def analyze_push_var(instruction)
       value_type = scope.get_var_type(instruction.name)
-      unless value_type
-        raise UndefinedVariable, "undefined local variable or method `#{instruction.name}`"
-      end
+      raise UndefinedVariable, "undefined local variable or method `#{instruction.name}`" unless value_type
       @stack << value_type
       instruction.type = value_type
     end

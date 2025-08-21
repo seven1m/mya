@@ -123,25 +123,33 @@ class VM
     end
 
     if receiver.respond_to?(name)
-      @stack << receiver.send(name, *new_args)
+      result = receiver.send(name, *new_args)
+      @stack << result
+
+      if name == :new && receiver.is_a?(ClassType) && (initialize_method = receiver.methods[:initialize])
+        instance = result
+        initialize_frame = { instructions: initialize_method, return_index: nil, with_scope: true }
+        initialize_scope = { args: new_args, vars: {}, self_obj: instance }
+        execute_frames([initialize_frame], scope: initialize_scope)
+        @stack << instance
+      end
+
       return
     end
-    if receiver.respond_to?(:methods) && receiver.methods.key?(name)
+    if receiver.respond_to?(:methods) && receiver.methods.is_a?(Hash) && receiver.methods.key?(name)
       push_frame(instructions: receiver.methods[name], return_index: @index, with_scope: true)
       @scope_stack << { args: new_args, vars: {}, self_obj: receiver }
       return
     end
 
+    # Check built-in methods (like puts) that can be called on any object
+    # FIXME: implement inheritance
     if (built_in_method = BUILT_IN_METHODS[instruction.name])
       @stack << built_in_method.call(*new_args, io: @io)
       return
     end
 
-    method_body = self_obj.methods[instruction.name]
-    raise NoMethodError, "Undefined method #{instruction.name}" unless method_body
-
-    push_frame(instructions: method_body, return_index: @index, with_scope: true)
-    @scope_stack << { args: new_args, vars: {}, self_obj: }
+    raise NoMethodError, "Undefined method #{instruction.name} for #{receiver.class}"
   end
 
   def execute_if(instruction)
@@ -176,9 +184,11 @@ class VM
 
   private
 
-  def execute_frames(frames)
+  def execute_frames(frames, scope: nil)
     saved_frames = @frames
     saved_index = @index
+
+    @scope_stack << scope if scope
 
     @frames = frames
     @index = 0

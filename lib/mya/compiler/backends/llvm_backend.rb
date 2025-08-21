@@ -107,6 +107,9 @@ class Compiler
           attr_types << llvm_type(ivar_type)
         end
 
+        # Ensure the struct has at least one field
+        attr_types << LLVM::Int8 if attr_types.empty?
+
         struct = LLVM.Struct(*attr_types, name.to_s)
         llvm_class = @classes[name.to_sym] = LLVMClass.new(struct, ivar_map)
         @methods[name.to_sym] = { new: method(:build_call_new) }
@@ -417,9 +420,16 @@ class Compiler
         }
       end
 
-      def build_call_new(builder:, args:, **)
+      def build_call_new(builder:, args:, instruction:, **)
         struct = args.first
-        ObjectBuilder.new(builder:, mod: @module, struct:).to_ptr
+        instance = ObjectBuilder.new(builder:, mod: @module, struct:).to_ptr
+
+        class_name = instruction.method_type.self_type.name.to_sym
+        if (initialize_fn = @methods.dig(class_name, :initialize))
+          builder.call(initialize_fn, instance)
+        end
+
+        instance
       end
 
       # usage:

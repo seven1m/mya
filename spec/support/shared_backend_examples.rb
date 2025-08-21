@@ -19,6 +19,19 @@ module SharedBackendExamples
         expect(execute('false')).must_equal(false)
       end
 
+      it 'calls `initialize` on new objects' do
+        code = <<~CODE
+          class Foo
+            def initialize
+              puts "Foo#initialize called"
+            end
+          end
+          Foo.new
+        CODE
+        out = execute_with_output(code)
+        expect(out).must_equal("Foo#initialize called\n")
+      end
+
       it 'evaluates classes with instance variables' do
         code = <<~CODE
           class Person
