@@ -416,6 +416,10 @@ describe Compiler do
   it 'compiles classes' do
     code = <<~CODE
       class Foo
+        def initialize
+          @bar = 0
+        end
+
         def set_bar(x)
           @bar = x
         end
@@ -432,6 +436,16 @@ describe Compiler do
                                instruction: :class,
                                name: :Foo,
                                body: [
+                                 {
+                                   type: 'Foo#initialize() => Integer',
+                                   instruction: :def,
+                                   name: :initialize,
+                                   params: [],
+                                   body: [
+                                     { type: 'Integer', instruction: :push_int, value: 0 },
+                                     { type: 'Integer', instruction: :set_ivar, name: :@bar },
+                                   ],
+                                 },
                                  {
                                    type: 'Foo#set_bar(Integer) => Integer',
                                    instruction: :def,

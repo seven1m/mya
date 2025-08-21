@@ -21,6 +21,11 @@ module SharedBackendExamples
       it 'evaluates classes with instance variables' do
         code = <<~CODE
           class Person
+            def initialize
+              @name = ""
+              @age = 0
+            end
+
             def name=(name) # name:String
               @name = name
             end
