@@ -207,6 +207,18 @@ describe Compiler do
     expect(e.message).must_equal('Not enough information to infer type of parameter `x` for method `foo` (line 1)')
   end
 
+  it 'raises error for unknown method' do
+    code = <<~CODE
+      class Foo
+      end
+
+      foo = Foo.new
+      foo.unknown_method
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::UndefinedMethod
+    expect(e.message).must_equal('undefined method `unknown_method` for Foo')
+  end
+
   # NOTE: we don't support monomorphization (yet!)
   it 'raises error for method arg with multiple types' do
     code = <<~CODE

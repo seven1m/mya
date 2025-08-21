@@ -170,7 +170,10 @@ class Compiler
         return false if receiver_resolved.is_a?(TypeVariable)
 
         method_type = receiver_resolved.get_method_type(@method_name)
-        return false unless method_type
+        unless method_type
+          # Method definitely not found on this resolved type
+          raise UndefinedMethod, "undefined method `#{@method_name}` for #{receiver_resolved}"
+        end
 
         # Store the full method type separately and set the return type as the main type
         @instruction.method_type = method_type
@@ -626,6 +629,9 @@ class Compiler
 
     def analyze_push_var(instruction)
       value_type = scope.get_var_type(instruction.name)
+      unless value_type
+        raise UndefinedVariable, "undefined local variable or method `#{instruction.name}`"
+      end
       @stack << value_type
       instruction.type = value_type
     end
