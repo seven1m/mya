@@ -426,7 +426,8 @@ class Compiler
 
         class_name = instruction.method_type.self_type.name.to_sym
         if (initialize_fn = @methods.dig(class_name, :initialize))
-          builder.call(initialize_fn, instance)
+          initialize_args = [instance] + args[1..]
+          builder.call(initialize_fn, *initialize_args)
         end
 
         instance

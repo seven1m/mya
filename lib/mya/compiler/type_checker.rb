@@ -499,14 +499,16 @@ class Compiler
       return_type = analyze_array_of_instructions(instruction.body)
       @scope_stack.pop
 
-      method_type =
-        MethodType.new(
-          name: instruction.name,
-          self_type: scope.self_type,
-          param_types: param_types,
-          return_type: return_type,
-        )
+      method_type = MethodType.new(name: instruction.name, self_type: scope.self_type, param_types:, return_type:)
       scope.self_type.define_method_type(instruction.name, method_type)
+
+      if instruction.name == :initialize
+        # update the new method to have the same parameters
+        new_method_type =
+          MethodType.new(name: :new, self_type: scope.self_type, param_types:, return_type: scope.self_type)
+        scope.self_type.define_method_type(:new, new_method_type)
+      end
+
       instruction.type = method_type
     end
 

@@ -7,7 +7,7 @@ class VM
 
     attr_reader :methods, :name
 
-    def new
+    def new(*args)
       ObjectType.new(self)
     end
   end

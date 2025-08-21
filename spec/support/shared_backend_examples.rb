@@ -22,14 +22,14 @@ module SharedBackendExamples
       it 'calls `initialize` on new objects' do
         code = <<~CODE
           class Foo
-            def initialize
-              puts "Foo#initialize called"
+            def initialize(x)
+              puts "Foo#initialize called with " + x
             end
           end
-          Foo.new
+          Foo.new("bar")
         CODE
         out = execute_with_output(code)
-        expect(out).must_equal("Foo#initialize called\n")
+        expect(out).must_equal("Foo#initialize called with bar\n")
       end
 
       it 'evaluates classes with instance variables' do
