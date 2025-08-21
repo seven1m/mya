@@ -18,16 +18,36 @@ module SharedBackendExamples
         expect(execute('false')).must_equal(false)
       end
 
-      it 'evaluates classes' do
+      it 'evaluates classes with instance variables' do
         code = <<~CODE
-          class Foo
-            def bar
-              @bar = 10
+          class Person
+            def name=(name) # name:String
+              @name = name
+            end
+
+            def age=(age) # age:Integer
+              @age = age
+            end
+
+            def name
+              @name
+            end
+
+            def age
+              @age
+            end
+
+            def info
+              @name + " is " + @age.to_s + " years old"
             end
           end
-          Foo.new.bar
+
+          person = Person.new
+          person.name = "Alice"
+          person.age = 30
+          person.info
         CODE
-        expect(execute(code)).must_equal(10)
+        expect(execute(code)).must_equal('Alice is 30 years old')
       end
 
       it 'evaluates variables set and get' do

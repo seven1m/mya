@@ -9,6 +9,15 @@ require_relative 'llvm_backend/string_builder'
 class Compiler
   module Backends
     class LLVMBackend
+      class LLVMClass
+        attr_reader :struct, :ivar_map
+
+        def initialize(struct, ivar_map)
+          @struct = struct
+          @ivar_map = ivar_map
+        end
+      end
+
       LIB_PATH = File.expand_path('../../../../build/lib.ll', __dir__)
 
       def initialize(instructions, dump: false)
@@ -26,12 +35,12 @@ class Compiler
       attr_reader :instructions
 
       def run
-        build_module
+        build_main_module
         execute(@entry)
       end
 
       def dump_ir_to_file(path)
-        build_module
+        build_main_module
         File.write(path, @module.to_s)
       end
 
@@ -48,17 +57,17 @@ class Compiler
         return_value
       end
 
-      def build_module
+      def build_main_module
         @module = LLVM::Module.new('llvm')
         @return_type = @instructions.last.type!
         @entry = @module.functions.add('main', [], llvm_type(@return_type))
-        build_function(@entry, @instructions)
+        build_main_function(@entry, @instructions)
         @lib.link_into(@module)
         @module.dump if @dump || !@module.valid?
         @module.verify!
       end
 
-      def build_function(function, instructions)
+      def build_main_function(function, instructions)
         function.basic_blocks.append.build do |builder|
           unused_for_now = LLVM::Int # need at least one struct member
           main_obj_struct = LLVM.Struct(unused_for_now, 'main')
@@ -91,10 +100,17 @@ class Compiler
 
       def build_class(instruction, function, builder)
         name = instruction.name
-        attr_types = instruction.type!.each_instance_variable.map { |_, t| llvm_type(t) }
-        klass = @classes[name.to_sym] = LLVM.Struct(*attr_types, name.to_s)
+        ivar_map = {}
+        attr_types = []
+        instruction.type!.each_instance_variable.with_index do |(ivar_name, ivar_type), index|
+          ivar_map[ivar_name] = index
+          attr_types << llvm_type(ivar_type)
+        end
+
+        struct = LLVM.Struct(*attr_types, name.to_s)
+        llvm_class = @classes[name.to_sym] = LLVMClass.new(struct, ivar_map)
         @methods[name.to_sym] = { new: method(:build_call_new) }
-        @scope_stack << { function:, vars: {}, self_obj: klass }
+        @scope_stack << { function:, vars: {}, self_obj: llvm_class }
         build_instructions(function, builder, instruction.body)
         @scope_stack.pop
       end
@@ -107,7 +123,14 @@ class Compiler
         return_type = llvm_type(instruction.return_type.resolve!)
         @methods[receiver_type.name.to_sym] ||= {}
         @methods[receiver_type.name.to_sym][name.to_sym] = fn = @module.functions.add(name, param_types, return_type)
-        build_function(fn, instruction.body)
+
+        llvm_class = @classes[receiver_type.name.to_sym]
+
+        fn.basic_blocks.append.build do |builder|
+          @scope_stack << { function: fn, vars: {}, self_obj: fn.params.first, llvm_class: }
+          build_instructions(fn, builder, instruction.body) { |return_value| builder.ret return_value }
+          @scope_stack.pop
+        end
       end
 
       def build_if(instruction, function, builder)
@@ -178,7 +201,8 @@ class Compiler
       end
 
       def build_push_const(instruction, _function, _builder)
-        @stack << @classes.fetch(instruction.name)
+        llvm_class = @classes.fetch(instruction.name)
+        @stack << llvm_class.struct
       end
 
       def build_push_false(_instruction, _function, _builder)
@@ -210,9 +234,27 @@ class Compiler
         @stack << builder.load(variable)
       end
 
-      def build_set_ivar(_instruction, _function, _builder)
-        # value = @stack.last
-        # self_obj.set_ivar(instruction.name, value)
+      def build_push_ivar(instruction, _function, builder)
+        ivar_name = instruction.name
+        ivar_map = scope.fetch(:llvm_class).ivar_map
+        field_index = ivar_map.fetch(ivar_name) { raise "Instance variable #{ivar_name} not found" }
+        self_ptr = scope.fetch(:function).params.first
+        struct_type = scope.fetch(:llvm_class).struct
+        field_ptr = builder.struct_gep2(struct_type, self_ptr, field_index, "ivar_#{ivar_name}")
+        expected_type = llvm_type(instruction.type!)
+        value = builder.load2(expected_type, field_ptr, "load_#{ivar_name}")
+        @stack << value
+      end
+
+      def build_set_ivar(instruction, _function, builder)
+        ivar_name = instruction.name
+        ivar_map = scope.fetch(:llvm_class).ivar_map
+        field_index = ivar_map.fetch(ivar_name) { raise "Instance variable #{ivar_name} not found" }
+        value = @stack.last
+        self_ptr = scope.fetch(:function).params.first
+        struct_type = scope.fetch(:llvm_class).struct
+        field_ptr = builder.struct_gep2(struct_type, self_ptr, field_index, "ivar_#{ivar_name}")
+        builder.store(value, field_ptr)
       end
 
       def build_set_var(instruction, _function, builder)
