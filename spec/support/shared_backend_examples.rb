@@ -7,6 +7,7 @@ module SharedBackendExamples
 
       it 'evaluates strings' do
         expect(execute('"foo"')).must_equal('foo')
+        expect(execute('"a longer string works too"')).must_equal('a longer string works too')
       end
 
       it 'evaluates nil' do

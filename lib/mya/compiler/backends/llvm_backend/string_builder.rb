@@ -9,8 +9,17 @@ class Compiler
 
           return if ptr
           str = LLVM::ConstantArray.string(string)
-          str_ptr = @builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
-          @builder.store(str, str_ptr)
+          str_global = @module.globals.add(LLVM::Type.array(LLVM::UInt8, string.bytesize + 1), '')
+          str_global.initializer = str
+          str_global.linkage = :private
+          str_global.global_constant = true
+          str_ptr =
+            @builder.gep2(
+              LLVM::Type.array(LLVM::UInt8, string.bytesize + 1),
+              str_global,
+              [LLVM.Int(0), LLVM.Int(0)],
+              'str',
+            )
           @builder.call(fn_rc_set_str, @ptr, str_ptr, LLVM.Int(string.bytesize))
 
           store_size(string.bytesize)
