@@ -882,6 +882,7 @@ class Compiler
       },
       Boolean: {
         :== => MethodType.new(self_type: BoolType, param_types: [BoolType], return_type: BoolType, name: :==),
+        :to_s => MethodType.new(self_type: BoolType, param_types: [], return_type: StrType, name: :to_s),
       },
       Object: {
         puts: MethodType.new(self_type: ObjectClass, param_types: [StrType], return_type: IntType, name: :puts),

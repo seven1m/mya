@@ -92,6 +92,22 @@ RC *int_to_string(int32_t value) {
     return rc;
 }
 
+RC *bool_to_string(int8_t value) {
+    RC *rc = malloc(sizeof(RC));
+    rc->ref_count = 1;
+
+    const char *str_value = value ? "true" : "false";
+    size_t len = strlen(str_value);
+
+    char *str = malloc(len + 1);
+    strcpy(str, str_value);
+
+    rc->ptr = str;
+    rc->size = len;
+
+    return rc;
+}
+
 RC *string_concat(const RC *left, const RC *right) {
     const char *left_str = left->ptr;
     const char *right_str = right->ptr;

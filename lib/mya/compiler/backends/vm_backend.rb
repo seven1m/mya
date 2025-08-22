@@ -106,7 +106,7 @@ class Compiler
       def execute_call(instruction)
         new_args = @stack.pop(instruction.arg_count)
 
-        receiver = @stack.pop or raise(ArgumentError, 'No receiver')
+        receiver = @stack.pop
         name = instruction.name
 
         if receiver.is_a?(OptionType)

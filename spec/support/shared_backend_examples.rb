@@ -340,7 +340,28 @@ module SharedBackendExamples
 
       it 'evaluates examples/countdown.rb' do
         result = execute_file(File.expand_path('../../examples/countdown.rb', __dir__))
-        expect(result).must_equal("5\n4\n3\n2\n1\nDone!\n")
+        expect(result).must_equal(<<~END)
+          5
+          4
+          3
+          2
+          1
+          Done!
+        END
+      end
+
+      it 'evaluates examples/countdown.rb' do
+        result = execute_file(File.expand_path('../../examples/type_annotations.rb', __dir__))
+        expect(result).must_equal(<<~END)
+          Alice is 25 years old with 0 points (active: false)
+          Alice is 25 years old with 100 points (active: true)
+          Adding 10 and 20
+          Sum: 30
+          Hello, Bob!
+          Greeted: Bob
+          Status is: false
+          Final status: false
+        END
       end
 
       it 'evaluates Option types with nil' do

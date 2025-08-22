@@ -351,6 +351,10 @@ class Compiler
         @fn_int_to_string ||= @module.functions.add('int_to_string', [LLVM::Int32], RcBuilder.pointer_type)
       end
 
+      def fn_bool_to_string
+        @fn_bool_to_string ||= @module.functions.add('bool_to_string', [LLVM::Int1], RcBuilder.pointer_type)
+      end
+
       def fn_string_concat
         @fn_string_concat ||=
           @module.functions.add(
@@ -394,6 +398,10 @@ class Compiler
             '==': ->(builder:, args:, **) do
               raise NotImplementedError, 'String comparison not yet implemented in LLVM backend'
             end,
+          },
+          Boolean: {
+            '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
+            to_s: ->(builder:, args:, **) { builder.call(fn_bool_to_string, args.first) },
           },
           Object: {
             puts: ->(builder:, args:, **) do
