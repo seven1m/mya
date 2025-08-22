@@ -6,36 +6,36 @@ class Person
     @score = 0 # @score:Integer
   end
 
-  def name
+  def name # -> String
     @name
   end
 
-  def age
+  def age # -> Integer
     @age
   end
 
-  def active=(active)
+  def active=(active) # active:Boolean
     @active = active
   end
 
-  def active
+  def active # -> Boolean
     @active
   end
 
-  def score
+  def score # -> Integer
     @score
   end
 
-  def add_points(points) # points:Integer
+  def add_points(points) # points:Integer -> Integer
     @score = @score + points
   end
 
-  def info
+  def info # -> String
     @name + ' is ' + @age.to_s + ' years old with ' + @score.to_s + ' points (active: ' + @active.to_s + ')'
   end
 end
 
-def process_data
+def process_data # -> Integer
   count = 5 # count:Integer
   message = 'Count is: ' # message:String
   finished = true # finished:Boolean
@@ -48,19 +48,31 @@ def process_data
   count
 end
 
-def add_numbers(x, y) # x:Integer, y:Integer
+def add_numbers(x, y) # x:Integer, y:Integer -> Integer
   puts 'Adding ' + x.to_s + ' and ' + y.to_s
   x + y
 end
 
-def greet_person(name) # name:String
+def greet_person(name) # name:String -> String
   puts 'Hello, ' + name + '!'
   name
 end
 
-def check_status(active) # active:Boolean
+def check_status(active) # active:Boolean -> Boolean
   puts 'Status is: ' + active.to_s
   active
+end
+
+def get_greeting # -> String
+  "Welcome to Mya!"
+end
+
+def maybe_process(value) # value:Option[String] -> String
+  if value
+    "Processed: " + value.value!
+  else
+    "Nothing to process"
+  end
 end
 
 person = Person.new('Alice', 25, false)
@@ -78,3 +90,10 @@ puts 'Greeted: ' + greeting
 
 status = check_status(false)
 puts 'Final status: ' + status.to_s
+
+puts get_greeting
+
+result1 = maybe_process("data")
+result2 = maybe_process(nil)
+puts result1
+puts result2

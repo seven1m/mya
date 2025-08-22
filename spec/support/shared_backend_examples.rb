@@ -360,7 +360,7 @@ module SharedBackendExamples
         END
       end
 
-      it 'evaluates examples/countdown.rb' do
+      it 'evaluates examples/type_annotations.rb' do
         result = execute_file(File.expand_path('../../examples/type_annotations.rb', __dir__))
         expect(result).must_equal(<<~END)
           Alice is 25 years old with 0 points (active: false)
@@ -371,6 +371,9 @@ module SharedBackendExamples
           Greeted: Bob
           Status is: false
           Final status: false
+          Welcome to Mya!
+          Processed: data
+          Nothing to process
         END
       end
 

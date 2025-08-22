@@ -37,10 +37,13 @@ class Compiler
 
   def parse_type_annotations(text)
     annotations = {}
+    annotations[:return_type] = parse_type_spec($1) if text =~ /->\s*([A-Z]\w*(?:\[[A-Z]\w*\])?)/
+
     # Match patterns like "a:Integer", "b:String", "c:Option[String]", "@name:String"
     text.scan(/(@?\w+)\s*:\s*([A-Z]\w*(?:\[[A-Z]\w*\])?)/) do |var_name, type_spec|
       annotations[var_name.to_sym] = parse_type_spec(type_spec)
     end
+
     annotations
   end
 
@@ -106,7 +109,9 @@ class Compiler
     instruction = DefInstruction.new(node.name, line: node.location.start_line)
 
     if (line_directives = @directives[node.location.start_line]) && (annotations = line_directives[:type_annotations])
-      instruction.type_annotations = annotations
+      param_annotations = annotations.reject { |key, _| key == :return_type }
+      instruction.type_annotations = param_annotations unless param_annotations.empty?
+      instruction.return_type_annotation = annotations[:return_type] if annotations[:return_type]
     end
 
     def_instructions = []

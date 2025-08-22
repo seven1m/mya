@@ -1351,4 +1351,90 @@ describe Compiler do
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
     expect(e.message).must_include('cannot constrain String to Integer')
   end
+
+  it 'parses return type annotations' do
+    code = <<~CODE
+      def foo # -> String
+        "hello"
+      end
+    CODE
+
+    compiler = Compiler.new(code)
+    instructions = compiler.compile
+    def_instruction = instructions.first
+
+    expect(def_instruction).must_be_instance_of(Compiler::DefInstruction)
+    expect(def_instruction.return_type_annotation).must_equal(:String)
+  end
+
+  it 'parses return type annotations with parameters' do
+    code = <<~CODE
+      def add(a, b) # a:Integer, b:Integer -> Integer
+        a + b
+      end
+    CODE
+
+    compiler = Compiler.new(code)
+    instructions = compiler.compile
+    def_instruction = instructions.first
+
+    expect(def_instruction).must_be_instance_of(Compiler::DefInstruction)
+    expect(def_instruction.return_type_annotation).must_equal(:Integer)
+    expect(def_instruction.type_annotations[:a]).must_equal(:Integer)
+    expect(def_instruction.type_annotations[:b]).must_equal(:Integer)
+  end
+
+  it 'parses generic return type annotations' do
+    code = <<~CODE
+      def maybe_value # -> Option[String]
+        "test"
+      end
+    CODE
+
+    compiler = Compiler.new(code)
+    instructions = compiler.compile
+    def_instruction = instructions.first
+
+    expect(def_instruction).must_be_instance_of(Compiler::DefInstruction)
+    expect(def_instruction.return_type_annotation).must_equal({ generic: :Option, inner: :String })
+  end
+
+  it 'enforces return type annotations during type checking' do
+    code = <<~CODE
+      def wrong_type # -> String
+        42
+      end
+    CODE
+
+    expect { compile(code) }.must_raise(Compiler::TypeChecker::TypeClash)
+  end
+
+  it 'allows correct return types' do
+    code = <<~CODE
+      def correct_type # -> Integer
+        42
+      end
+    CODE
+
+    compiler = Compiler.new(code)
+    instructions = compiler.compile
+    def_instruction = instructions.first
+
+    expect(def_instruction.return_type.to_s).must_equal('Integer')
+  end
+
+  it 'works without return type annotations' do
+    code = <<~CODE
+      def no_annotation
+        "inferred"
+      end
+    CODE
+
+    compiler = Compiler.new(code)
+    instructions = compiler.compile
+    def_instruction = instructions.first
+
+    expect(def_instruction.return_type_annotation).must_be_nil
+    expect(def_instruction.return_type.to_s).must_equal('String')
+  end
 end

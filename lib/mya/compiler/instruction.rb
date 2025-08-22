@@ -224,10 +224,11 @@ class Compiler
       @name = name
       @params = []
       @type_annotations = {}
+      @return_type_annotation = nil
     end
 
     attr_reader :name
-    attr_accessor :body, :params, :type_annotations
+    attr_accessor :body, :params, :type_annotations, :return_type_annotation
 
     def instruction_name = :def
 

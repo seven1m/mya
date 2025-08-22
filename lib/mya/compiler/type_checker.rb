@@ -496,8 +496,27 @@ class Compiler
       end
 
       @scope_stack.push(method_scope)
-      return_type = analyze_array_of_instructions(instruction.body)
+      inferred_return_type = analyze_array_of_instructions(instruction.body)
       @scope_stack.pop
+
+      return_type = if instruction.return_type_annotation
+        annotated_return_type = resolve_type_from_name(instruction.return_type_annotation)
+        # Add constraint to ensure the inferred type matches the annotation
+        add_constraint(
+          Constraint.new(
+            annotated_return_type,
+            inferred_return_type,
+            context: :method_return_type,
+            context_data: {
+              method_name: instruction.name,
+              line: instruction.line,
+            },
+          ),
+        )
+        annotated_return_type
+      else
+        inferred_return_type
+      end
 
       method_type = MethodType.new(name: instruction.name, self_type: scope.self_type, param_types:, return_type:)
       scope.self_type.define_method_type(instruction.name, method_type)
