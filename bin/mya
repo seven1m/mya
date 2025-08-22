@@ -1,21 +1,77 @@
 #!/usr/bin/env ruby
 
-require_relative "../lib/mya"
+require_relative '../lib/mya'
+require 'optparse'
 
-args = ARGV.dup
-dump_llvm = args.delete("--dump-llvm")
-llvm = args.delete("--llvm") || dump_llvm
-dump_ir = args.delete("--dump-ir")
+options = {}
+parser =
+  OptionParser.new do |opts|
+    opts.banner = "Usage: mya [options] file.rb\n       mya [options] -e 'code'"
 
-code =
-  if args.first == "-e"
-    args[1]
-  else
-    File.read(args.first)
+    opts.on('-e CODE', 'Execute code string') { |code| options[:code] = code }
+
+    opts.on('-d DEBUG', %w[ir llvm-ir], 'Show debug output (ir, llvm-ir)') { |debug| options[:debug] = debug }
+
+    opts.on('--backend BACKEND', %w[vm llvm], 'Execute with specified backend (vm, llvm)') do |backend|
+      options[:backend] = backend
+    end
+
+    opts.on('-h', '--help', 'Show this help') do
+      puts opts
+      exit
+    end
   end
 
-instructions = Compiler.new(code).compile
+begin
+  parser.parse!
+rescue OptionParser::InvalidOption => e
+  puts "Error: #{e.message}"
+  puts parser
+  exit 1
+rescue OptionParser::InvalidArgument => e
+  puts "Error: #{e.message}"
+  puts parser
+  exit 1
+end
 
-pp instructions.map(&:to_h) if dump_ir
+code =
+  if options[:code]
+    options[:code]
+  elsif ARGV.first
+    begin
+      File.read(ARGV.first)
+    rescue Errno::ENOENT
+      puts "Error: File '#{ARGV.first}' not found"
+      exit 1
+    end
+  else
+    puts "Error: No code provided. Use -e 'code' or specify a file."
+    puts parser
+    exit 1
+  end
 
-llvm ? Compiler::Backends::LLVMBackend.new(instructions, dump: dump_llvm).run : VM.new(instructions).run
+compiler = Compiler.new(code)
+instructions = compiler.compile
+
+if options[:debug]
+  case options[:debug]
+  when 'ir'
+    instructions.each_with_index { |inst, i| puts "#{i}: #{inst.to_h}" }
+  when 'llvm-ir'
+    llvm_backend = Compiler::Backends::LLVMBackend.new(instructions, dump: true)
+    llvm_backend.dump_ir_to_file('/tmp/mya_output.ll')
+    llvm_ir = File.read('/tmp/mya_output.ll')
+    puts llvm_ir
+  end
+  exit 0
+end
+
+if options[:backend] == 'vm'
+  vm = VM.new(instructions)
+  result = vm.run
+  puts result
+else
+  llvm_backend = Compiler::Backends::LLVMBackend.new(instructions, dump: false)
+  result = llvm_backend.run
+  puts result
+end
