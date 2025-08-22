@@ -10,6 +10,27 @@ The name "mya" is just a working name... the name will likely change.
 
 ## TODO
 
+### Basic Ruby Syntax Missing
+- **Logical operators**: `&&`, `||`, `!` (and, or, not operators)
+- **Control flow**: `break`, `next`, `return` statements
+- **Conditional statements**: `unless`, `elsif` (only basic `if`/`else` supported)
+- **Pattern matching**: `case`/`when` statements
+- **Loop constructs**: `until`, `for` loops (only `while` supported)
+- **Exception handling**: `begin`/`rescue`/`ensure`/`raise`
+- **Comparison operators**: `!=`, `<=>` (spaceship operator)
+- **Assignment operators**: `+=`, `-=`, `*=`, `/=`, `||=`, `&&=`
+- **Range operators**: `..`, `...` (inclusive/exclusive ranges)
+- **String interpolation**: `"Hello #{name}"` syntax
+- **Symbols**: `:symbol` syntax
+- **Hash literals**: `{ key: value }` syntax
+- **Block syntax**: `{ |x| ... }` and `do |x| ... end`
+- **Iterators**: `.each`, `.map`, `.select`, etc.
+- **Multiple assignment**: `a, b = 1, 2`
+- **Splat operators**: `*args`, `**kwargs`
+- **Constants**: Proper constant definition and scoping
+- **Module system**: `module` and `include`/`extend`
+
+### Type System & Language Features
 - **Missing Array type annotations**: While the type system supports `Array[Type]` internally, the syntax for array type annotations in comments may not be fully implemented
 - **No generic type syntax documentation**: The supported generic type syntax (e.g., `Option[String]`) needs better documentation and examples
 - **Type annotation error messages**: Error messages for type annotation mismatches could be more descriptive and include context about where the annotation was defined
