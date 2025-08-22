@@ -268,6 +268,16 @@ module SharedBackendExamples
         expect(execute(code)).must_equal(5)
       end
 
+      it 'evaluates if statements without else clause' do
+        code = <<~CODE
+           if true
+             42
+           end
+           nil
+         CODE
+        assert_nil(execute(code))
+      end
+
       it 'evaluates puts for strings' do
         code = <<~CODE
            puts("hello")

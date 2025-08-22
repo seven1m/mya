@@ -152,12 +152,14 @@ class Compiler
         builder.cond(condition, then_block, else_block)
         then_block.build do |then_builder|
           build_instructions(function, then_builder, instruction.if_true) do |value|
+            value = RcBuilder.pointer_type.null_pointer if value.nil?
             then_builder.store(value, result)
             then_builder.br(result_block)
           end
         end
         else_block.build do |else_builder|
           build_instructions(function, else_builder, instruction.if_false) do |value|
+            value = RcBuilder.pointer_type.null_pointer if value.nil?
             else_builder.store(value, result)
             else_builder.br(result_block)
           end

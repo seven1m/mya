@@ -10,7 +10,6 @@ The name "mya" is just a working name... the name will likely change.
 
 ## TODO
 
-- **LLVM backend issues with if statements**: The LLVM backend has problems with certain if statement patterns, particularly those without else clauses in some contexts, causing runtime errors during code generation
 - **Missing Array type annotations**: While the type system supports `Array[Type]` internally, the syntax for array type annotations in comments may not be fully implemented
 - **No generic type syntax documentation**: The supported generic type syntax (e.g., `Option[String]`) needs better documentation and examples
 - **Type annotation error messages**: Error messages for type annotation mismatches could be more descriptive and include context about where the annotation was defined
