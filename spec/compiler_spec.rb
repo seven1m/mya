@@ -70,11 +70,17 @@ describe Compiler do
                            ]
 
     code = <<~CODE
-      message = "hello" # message:Option[String]
+      message = nil # message:Option[String]
+      message = "hello"
+      message = nil
       message
     CODE
     expect(compile(code)).must_equal_with_diff [
+                             { type: 'NilClass', instruction: :push_nil },
+                             { type: 'Option[String]', instruction: :set_var, name: :message },
                              { type: 'String', instruction: :push_str, value: 'hello' },
+                             { type: 'Option[String]', instruction: :set_var, name: :message },
+                             { type: 'NilClass', instruction: :push_nil },
                              { type: 'Option[String]', instruction: :set_var, name: :message },
                              { type: 'Option[String]', instruction: :push_var, name: :message },
                            ]

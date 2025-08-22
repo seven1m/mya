@@ -719,8 +719,9 @@ class Compiler
         scope.set_var_type(instruction.name, annotated_type)
         instruction.type = annotated_type
       else
+        existing_type = scope.get_var_type(instruction.name)
         scope.set_var_type(instruction.name, value_type)
-        instruction.type = value_type
+        instruction.type = existing_type || value_type
       end
     end
 
