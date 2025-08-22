@@ -64,14 +64,14 @@ def check_status(active) # active:Boolean -> Boolean
 end
 
 def get_greeting # -> String
-  "Welcome to Mya!"
+  'Welcome to Mya!'
 end
 
 def maybe_process(value) # value:Option[String] -> String
   if value
-    "Processed: " + value.value!
+    'Processed: ' + value.value!
   else
-    "Nothing to process"
+    'Nothing to process'
   end
 end
 
@@ -93,7 +93,7 @@ puts 'Final status: ' + status.to_s
 
 puts get_greeting
 
-result1 = maybe_process("data")
+result1 = maybe_process('data')
 result2 = maybe_process(nil)
 puts result1
 puts result2
