@@ -6,7 +6,4 @@ This is maybe going to be a statically-typed subset of the Ruby language. Or it 
 
 This is also my first foray into using LLVM as a backend, so there's a lot of learning going on here!
 
-I have documented some of my progress on this project via my YouTube channel, in a playlist
-called [Compiler Fun](https://www.youtube.com/watch?v=LTMsH69_lmE&list=PLWUx_XkUoGToXnl24MJFaY95f4YHv5g4B).
-
-The name "mya" is just a working name... it will likely change.
+The name "mya" is just a working name... the name will likely change.
