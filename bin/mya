@@ -68,10 +68,8 @@ end
 
 if options[:backend] == 'vm'
   vm_backend = Compiler::Backends::VMBackend.new(instructions)
-  result = vm_backend.run
-  puts result
+  vm_backend.run
 else
   llvm_backend = Compiler::Backends::LLVMBackend.new(instructions, dump: false)
-  result = llvm_backend.run
-  puts result
+  llvm_backend.run
 end
