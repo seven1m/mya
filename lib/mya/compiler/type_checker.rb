@@ -680,7 +680,8 @@ class Compiler
         @stack << annotated_type
         instruction.type = annotated_type
       else
-        if (existing_type = class_type.get_instance_variable(instruction.name))
+        existing_type = class_type.get_instance_variable(instruction.name)
+        if existing_type
           constraint =
             Constraint.new(
               existing_type,
@@ -695,8 +696,8 @@ class Compiler
           class_type.define_instance_variable(instruction.name, value_type)
         end
 
-        @stack << value_type
-        instruction.type = value_type
+        @stack << (existing_type || value_type)
+        instruction.type = existing_type || value_type
       end
     end
 

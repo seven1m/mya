@@ -1226,6 +1226,82 @@ describe Compiler do
                            ]
   end
 
+  it 'maintains Option[] type when reassigning instance variables' do
+    code = <<~CODE
+      class Person
+        def initialize
+          @message = nil # @message:Option[String]
+          @message = "hello"
+          @message = nil
+        end
+
+        def message
+          @message
+        end
+      end
+
+      person = Person.new
+      person.message
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Person',
+                               instruction: :class,
+                               name: :Person,
+                               body: [
+                                 {
+                                   type: 'Person#initialize() => Option[String]',
+                                   instruction: :def,
+                                   name: :initialize,
+                                   params: [],
+                                   body: [
+                                     { type: 'NilClass', instruction: :push_nil },
+                                     {
+                                       type: 'Option[String]',
+                                       instruction: :set_ivar,
+                                       name: :@message,
+                                       type_annotation: {
+                                         generic: :Option,
+                                         inner: :String,
+                                       },
+                                     },
+                                     { type: 'NilClass', instruction: :pop },
+                                     { type: 'String', instruction: :push_str, value: 'hello' },
+                                     { type: 'Option[String]', instruction: :set_ivar, name: :@message },
+                                     { type: 'NilClass', instruction: :pop },
+                                     { type: 'NilClass', instruction: :push_nil },
+                                     { type: 'Option[String]', instruction: :set_ivar, name: :@message },
+                                   ],
+                                 },
+                                 {
+                                   type: 'Person#message() => Option[String]',
+                                   instruction: :def,
+                                   name: :message,
+                                   params: [],
+                                   body: [{ type: 'Option[String]', instruction: :push_ivar, name: :@message }],
+                                 },
+                               ],
+                             },
+                             { type: 'Person', instruction: :push_const, name: :Person },
+                             {
+                               type: 'Person',
+                               instruction: :call,
+                               name: :new,
+                               arg_count: 0,
+                               method_type: 'Person#new() => Person',
+                             },
+                             { type: 'Person', instruction: :set_var, name: :person },
+                             { type: 'Person', instruction: :push_var, name: :person },
+                             {
+                               type: 'Option[String]',
+                               instruction: :call,
+                               name: :message,
+                               arg_count: 0,
+                               method_type: 'Person#message() => Option[String]',
+                             },
+                           ]
+  end
+
   it 'raises error for instance variable type annotation mismatch' do
     code = <<~CODE
       class Person
