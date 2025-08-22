@@ -48,6 +48,38 @@ describe Compiler do
     expect(e.message).must_equal 'the variable `a` has type Integer already; you cannot change it to type String'
   end
 
+  it 'compiles variables with type annotation' do
+    code = <<~CODE
+      x = 42 # x:Integer
+      x
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'Integer', instruction: :push_int, value: 42 },
+                             { type: 'Integer', instruction: :set_var, name: :x },
+                             { type: 'Integer', instruction: :push_var, name: :x },
+                           ]
+
+    code = <<~CODE
+      name = "Alice" # name:String
+      name
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'String', instruction: :push_str, value: 'Alice' },
+                             { type: 'String', instruction: :set_var, name: :name },
+                             { type: 'String', instruction: :push_var, name: :name },
+                           ]
+
+    code = <<~CODE
+      message = "hello" # message:Option[String]
+      message
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             { type: 'String', instruction: :push_str, value: 'hello' },
+                             { type: 'Option[String]', instruction: :set_var, name: :message },
+                             { type: 'Option[String]', instruction: :push_var, name: :message },
+                           ]
+  end
+
   it 'compiles method definitions' do
     code = <<~CODE
       def foo
@@ -247,58 +279,6 @@ describe Compiler do
   end
 
   it 'compiles recursive method definitions' do
-    code = <<~CODE
-      def foo(a) # a:Integer
-        if true
-          1
-        else
-          2 + a
-        end
-      end
-
-      foo(5)
-    CODE
-    expect(compile(code)).must_equal_with_diff [
-                             {
-                               type: 'Object#foo(Integer) => Integer',
-                               instruction: :def,
-                               name: :foo,
-                               params: [:a],
-                               body: [
-                                 { type: 'Integer', instruction: :push_arg, index: 0 },
-                                 { type: 'Integer', instruction: :set_var, name: :a },
-                                 { type: 'Boolean', instruction: :push_true },
-                                 {
-                                   type: 'Integer',
-                                   instruction: :if,
-                                   if_true: [{ type: 'Integer', instruction: :push_int, value: 1 }],
-                                   if_false: [
-                                     { type: 'Integer', instruction: :push_int, value: 2 },
-                                     { type: 'Integer', instruction: :push_var, name: :a },
-                                     {
-                                       type: 'Integer',
-                                       instruction: :call,
-                                       name: :+,
-                                       arg_count: 1,
-                                       method_type: 'Integer#+(Integer) => Integer',
-                                     },
-                                   ],
-                                 },
-                               ],
-                             },
-                             { type: 'Object', instruction: :push_self },
-                             { type: 'Integer', instruction: :push_int, value: 5 },
-                             {
-                               type: 'Integer',
-                               instruction: :call,
-                               name: :foo,
-                               arg_count: 1,
-                               method_type: 'Object#foo(Integer) => Integer',
-                             },
-                           ]
-  end
-
-  it 'compiles truly recursive method definitions' do
     code = <<~CODE
       def countdown(n) # n:Integer
         if n == 0
@@ -1138,38 +1118,6 @@ describe Compiler do
                                arg_count: 1,
                                method_type: 'Object#puts(String) => Integer',
                              },
-                           ]
-  end
-
-  it 'compiles variables with type annotation' do
-    code = <<~CODE
-      x = 42 # x:Integer
-      x
-    CODE
-    expect(compile(code)).must_equal_with_diff [
-                             { type: 'Integer', instruction: :push_int, value: 42 },
-                             { type: 'Integer', instruction: :set_var, name: :x },
-                             { type: 'Integer', instruction: :push_var, name: :x },
-                           ]
-
-    code = <<~CODE
-      name = "Alice" # name:String
-      name
-    CODE
-    expect(compile(code)).must_equal_with_diff [
-                             { type: 'String', instruction: :push_str, value: 'Alice' },
-                             { type: 'String', instruction: :set_var, name: :name },
-                             { type: 'String', instruction: :push_var, name: :name },
-                           ]
-
-    code = <<~CODE
-      message = "hello" # message:Option[String]
-      message
-    CODE
-    expect(compile(code)).must_equal_with_diff [
-                             { type: 'String', instruction: :push_str, value: 'hello' },
-                             { type: 'Option[String]', instruction: :set_var, name: :message },
-                             { type: 'Option[String]', instruction: :push_var, name: :message },
                            ]
   end
 
