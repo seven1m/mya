@@ -67,8 +67,8 @@ if options[:debug]
 end
 
 if options[:backend] == 'vm'
-  vm = VM.new(instructions)
-  result = vm.run
+  vm_backend = Compiler::Backends::VMBackend.new(instructions)
+  result = vm_backend.run
   puts result
 else
   llvm_backend = Compiler::Backends::LLVMBackend.new(instructions, dump: false)

@@ -3,6 +3,7 @@ require 'prism'
 require_relative 'compiler/instruction'
 require_relative 'compiler/type_checker'
 require_relative 'compiler/backends/llvm_backend'
+require_relative 'compiler/backends/vm_backend'
 
 class Compiler
   def initialize(code)
