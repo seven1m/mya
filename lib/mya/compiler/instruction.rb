@@ -119,14 +119,18 @@ class Compiler
     def initialize(name, line:)
       super(line:)
       @name = name
+      @type_annotation = nil
     end
 
     attr_reader :name
+    attr_accessor :type_annotation
 
     def instruction_name = :set_ivar
 
     def to_h
-      super.merge(name:)
+      result = super.merge(name:)
+      result[:type_annotation] = @type_annotation if @type_annotation
+      result
     end
   end
 

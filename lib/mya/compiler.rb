@@ -163,6 +163,12 @@ class Compiler
   def transform_instance_variable_write_node(node, used:)
     transform(node.value, used: true)
     instruction = SetInstanceVarInstruction.new(node.name, line: node.location.start_line)
+
+    if (line_directives = @directives[node.location.start_line]) &&
+         (annotations = line_directives[:type_annotations]) && (type_annotation = annotations[node.name])
+      instruction.type_annotation = type_annotation
+    end
+
     @instructions << instruction
     @instructions << PopInstruction.new unless used
   end

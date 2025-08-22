@@ -646,29 +646,63 @@ class Compiler
 
       class_type = scope.self_type
 
-      if (existing_type = class_type.get_instance_variable(instruction.name))
+      if instruction.type_annotation
+        annotated_type = resolve_type_from_name(instruction.type_annotation)
+
+        if (existing_type = class_type.get_instance_variable(instruction.name))
+          constraint =
+            Constraint.new(
+              existing_type,
+              annotated_type,
+              context: :type_annotation_mismatch,
+              context_data: {
+                variable_name: instruction.name,
+                annotation: instruction.type_annotation,
+              },
+            )
+          add_constraint(constraint)
+        else
+          class_type.define_instance_variable(instruction.name, annotated_type)
+        end
+
         constraint =
           Constraint.new(
-            existing_type,
+            annotated_type,
             value_type,
-            context: :variable_reassignment,
+            context: :type_annotation_assignment,
             context_data: {
               variable_name: instruction.name,
+              annotation: instruction.type_annotation,
             },
           )
         add_constraint(constraint)
-      else
-        class_type.define_instance_variable(instruction.name, value_type)
-      end
 
-      @stack << value_type
-      instruction.type = value_type
+        @stack << annotated_type
+        instruction.type = annotated_type
+      else
+        if (existing_type = class_type.get_instance_variable(instruction.name))
+          constraint =
+            Constraint.new(
+              existing_type,
+              value_type,
+              context: :variable_reassignment,
+              context_data: {
+                variable_name: instruction.name,
+              },
+            )
+          add_constraint(constraint)
+        else
+          class_type.define_instance_variable(instruction.name, value_type)
+        end
+
+        @stack << value_type
+        instruction.type = value_type
+      end
     end
 
     def analyze_set_var(instruction)
       value_type = @stack.pop
 
-      # If there's a type annotation, add a constraint but keep the actual value type
       if instruction.type_annotation
         annotated_type = resolve_type_from_name(instruction.type_annotation)
         add_constraint(

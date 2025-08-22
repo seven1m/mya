@@ -1129,4 +1129,106 @@ describe Compiler do
     e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
     expect(e.message).must_include('cannot constrain Integer to String')
   end
+
+  it 'compiles instance variables with type annotations' do
+    code = <<~CODE
+      class Person
+        def initialize
+          @name = "Alice" # @name:String
+          @age = 25 # @age:Integer
+        end
+
+        def name
+          @name
+        end
+
+        def age
+          @age
+        end
+      end
+
+      person = Person.new
+      person.name
+      person.age
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Person',
+                               instruction: :class,
+                               name: :Person,
+                               body: [
+                                 {
+                                   type: 'Person#initialize() => Integer',
+                                   instruction: :def,
+                                   name: :initialize,
+                                   params: [],
+                                   body: [
+                                     { type: 'String', instruction: :push_str, value: 'Alice' },
+                                     { type: 'String', instruction: :set_ivar, name: :@name, type_annotation: :String },
+                                     { type: 'NilClass', instruction: :pop },
+                                     { type: 'Integer', instruction: :push_int, value: 25 },
+                                     {
+                                       type: 'Integer',
+                                       instruction: :set_ivar,
+                                       name: :@age,
+                                       type_annotation: :Integer,
+                                     },
+                                   ],
+                                 },
+                                 {
+                                   type: 'Person#name() => String',
+                                   instruction: :def,
+                                   name: :name,
+                                   params: [],
+                                   body: [{ type: 'String', instruction: :push_ivar, name: :@name }],
+                                 },
+                                 {
+                                   type: 'Person#age() => Integer',
+                                   instruction: :def,
+                                   name: :age,
+                                   params: [],
+                                   body: [{ type: 'Integer', instruction: :push_ivar, name: :@age }],
+                                 },
+                               ],
+                             },
+                             { type: 'Person', instruction: :push_const, name: :Person },
+                             {
+                               type: 'Person',
+                               instruction: :call,
+                               name: :new,
+                               arg_count: 0,
+                               method_type: 'Person#new() => Person',
+                             },
+                             { type: 'Person', instruction: :set_var, name: :person },
+                             { type: 'Person', instruction: :push_var, name: :person },
+                             {
+                               type: 'String',
+                               instruction: :call,
+                               name: :name,
+                               arg_count: 0,
+                               method_type: 'Person#name() => String',
+                             },
+                             { type: 'NilClass', instruction: :pop },
+                             { type: 'Person', instruction: :push_var, name: :person },
+                             {
+                               type: 'Integer',
+                               instruction: :call,
+                               name: :age,
+                               arg_count: 0,
+                               method_type: 'Person#age() => Integer',
+                             },
+                           ]
+  end
+
+  it 'raises error for instance variable type annotation mismatch' do
+    code = <<~CODE
+      class Person
+        def initialize
+          @name = 42 # @name:String
+        end
+      end
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_include('cannot constrain String to Integer')
+  end
 end
