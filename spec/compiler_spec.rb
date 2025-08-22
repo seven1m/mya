@@ -675,6 +675,44 @@ describe Compiler do
                            ]
   end
 
+  it 'maintains Option[] type when reassigning method arguments' do
+    code = <<~CODE
+      def process_message(message) # message:Option[String]
+        message = nil
+        message = "hello"
+        message
+      end
+
+      process_message("world")
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+                             {
+                               type: 'Object#process_message(Option[String]) => Option[String]',
+                               instruction: :def,
+                               name: :process_message,
+                               params: [:message],
+                               body: [
+                                 { type: 'Option[String]', instruction: :push_arg, index: 0 },
+                                 { type: 'Option[String]', instruction: :set_var, name: :message },
+                                 { type: 'NilClass', instruction: :push_nil },
+                                 { type: 'Option[String]', instruction: :set_var, name: :message },
+                                 { type: 'String', instruction: :push_str, value: 'hello' },
+                                 { type: 'Option[String]', instruction: :set_var, name: :message },
+                                 { type: 'Option[String]', instruction: :push_var, name: :message },
+                               ],
+                             },
+                             { type: 'Object', instruction: :push_self },
+                             { type: 'String', instruction: :push_str, value: 'world' },
+                             {
+                               type: 'Option[String]',
+                               instruction: :call,
+                               name: :process_message,
+                               arg_count: 1,
+                               method_type: 'Object#process_message(Option[String]) => Option[String]',
+                             },
+                           ]
+  end
+
   it 'raises for invalid type passed to Option parameter' do
     code = <<~CODE
       def process_optional(value) # value:Option[String]
