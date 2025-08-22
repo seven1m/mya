@@ -7,3 +7,15 @@ This is maybe going to be a statically-typed subset of the Ruby language. Or it 
 This is also my first foray into using LLVM as a backend, so there's a lot of learning going on here!
 
 The name "mya" is just a working name... the name will likely change.
+
+## TODO
+
+- **Boolean#to_s method missing**: Boolean values don't have a `to_s` method, unlike Integer and String types
+- **Type annotation constraints too strict**: Once an instance variable is annotated with a type (e.g., `@var:NilClass`), it cannot be reassigned to a different type, even when that might be semantically valid (e.g., optional fields that start as nil but get assigned values later)
+- **LLVM backend issues with if statements**: The LLVM backend has problems with certain if statement patterns, particularly those without else clauses in some contexts, causing runtime errors during code generation
+- **Missing Array type annotations**: While the type system supports `Array[Type]` internally, the syntax for array type annotations in comments may not be fully implemented
+- **No generic type syntax documentation**: The supported generic type syntax (e.g., `Option[String]`) needs better documentation and examples
+- **Type annotation error messages**: Error messages for type annotation mismatches could be more descriptive and include context about where the annotation was defined
+- **Method return type annotations**: No syntax exists for annotating method return types (e.g., `def method_name -> ReturnType`)
+- **Class inheritance type checking**: Type checking for class inheritance and method overriding is not implemented
+- **Nil safety**: While Option types exist, there's no comprehensive nil safety system like other modern typed languages
