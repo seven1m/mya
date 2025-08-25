@@ -34,5 +34,4 @@ The name "mya" is just a working name... the name will likely change.
 - **Missing Array type annotations**: While the type system supports `Array[Type]` internally, the syntax for array type annotations in comments may not be fully implemented
 - **No generic type syntax documentation**: The supported generic type syntax (e.g., `Option[String]`) needs better documentation and examples
 - **Type annotation error messages**: Error messages for type annotation mismatches could be more descriptive and include context about where the annotation was defined
-- **Class inheritance type checking**: Type checking for class inheritance and method overriding is not implemented
 - **Nil safety**: While Option types exist, there's no comprehensive nil safety system like other modern typed languages

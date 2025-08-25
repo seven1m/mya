@@ -2,15 +2,22 @@ class Compiler
   module Backends
     class VMBackend
       class ClassType
-        def initialize(name)
+        def initialize(name, superclass: nil)
           @name = name
+          @superclass = superclass
           @methods = {}
         end
 
-        attr_reader :methods, :name
+        attr_reader :methods, :name, :superclass
 
         def new(*args)
           ObjectType.new(self)
+        end
+
+        def find_method(name)
+          return @methods[name] if @methods.key?(name)
+          return @superclass.find_method(name) if @superclass
+          nil
         end
       end
 
@@ -57,7 +64,11 @@ class Compiler
         end
       end
 
-      MainClass = ClassType.new('main')
+      # Create the base Object class with built-in methods
+      ObjectClass = ClassType.new('Object')
+      ObjectClass.methods[:puts] = [{ instruction: :builtin_puts }]
+
+      MainClass = ClassType.new('main', superclass: ObjectClass)
       MainObject = ObjectType.new(MainClass)
 
       def initialize(instructions, io: $stdout)
@@ -66,7 +77,7 @@ class Compiler
         @frames = [{ instructions:, return_index: nil }]
         @scope_stack = [{ args: [], vars: {}, self_obj: MainObject }]
         @if_depth = 0
-        @classes = {}
+        @classes = { 'Object' => ObjectClass }
         @io = io
       end
 
@@ -94,7 +105,15 @@ class Compiler
       end
 
       def execute_class(instruction)
-        klass = @classes[instruction.name] = ClassType.new(instruction.name)
+        superclass =
+          if instruction.superclass
+            @classes[instruction.superclass]
+          elsif instruction.name != 'Object'
+            @classes['Object']
+          else
+            nil
+          end
+        klass = @classes[instruction.name] = ClassType.new(instruction.name, superclass:)
         push_frame(instructions: instruction.body, return_index: @index, with_scope: true)
         @scope_stack << { vars: {}, self_obj: klass }
       end
@@ -128,7 +147,7 @@ class Compiler
           result = receiver.send(name, *new_args)
           @stack << result
 
-          if name == :new && receiver.is_a?(ClassType) && (initialize_method = receiver.methods[:initialize])
+          if name == :new && receiver.is_a?(ClassType) && (initialize_method = receiver.find_method(:initialize))
             instance = result
             initialize_frame = { instructions: initialize_method, return_index: nil, with_scope: true }
             initialize_scope = { args: new_args, vars: {}, self_obj: instance }
@@ -138,16 +157,26 @@ class Compiler
 
           return
         end
-        if receiver.respond_to?(:methods) && receiver.methods.is_a?(Hash) && receiver.methods.key?(name)
-          push_frame(instructions: receiver.methods[name], return_index: @index, with_scope: true)
+
+        if receiver.is_a?(ClassType) && (method_body = receiver.find_method(name))
+          if method_body.is_a?(Array) && method_body.first.is_a?(Hash) &&
+               method_body.first[:instruction] == :builtin_puts
+            @stack << BUILT_IN_METHODS[:puts].call(*new_args, io: @io)
+            return
+          end
+          push_frame(instructions: method_body, return_index: @index, with_scope: true)
           @scope_stack << { args: new_args, vars: {}, self_obj: receiver }
           return
         end
 
-        # Check built-in methods (like puts) that can be called on any object
-        # FIXME: implement inheritance
-        if (built_in_method = BUILT_IN_METHODS[instruction.name])
-          @stack << built_in_method.call(*new_args, io: @io)
+        if receiver.is_a?(ObjectType) && (method_body = receiver.klass.find_method(name))
+          if method_body.is_a?(Array) && method_body.first.is_a?(Hash) &&
+               method_body.first[:instruction] == :builtin_puts
+            @stack << BUILT_IN_METHODS[:puts].call(*new_args, io: @io)
+            return
+          end
+          push_frame(instructions: method_body, return_index: @index, with_scope: true)
+          @scope_stack << { args: new_args, vars: {}, self_obj: receiver }
           return
         end
 

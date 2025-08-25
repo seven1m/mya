@@ -88,7 +88,8 @@ class Compiler
 
   def transform_class_node(node, used:)
     name = node.constant_path.name
-    instruction = ClassInstruction.new(name, line: node.location.start_line)
+    superclass = node.superclass&.name
+    instruction = ClassInstruction.new(name, line: node.location.start_line, superclass:)
     class_instructions = []
     with_instructions_array(class_instructions) { transform(node.body, used: false) } if node.body
     instruction.body = class_instructions

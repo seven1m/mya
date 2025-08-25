@@ -241,18 +241,21 @@ class Compiler
   end
 
   class ClassInstruction < Instruction
-    def initialize(name, line:)
+    def initialize(name, line:, superclass: nil)
       super(line:)
       @name = name
+      @superclass = superclass
     end
 
-    attr_reader :name
+    attr_reader :name, :superclass
     attr_accessor :body
 
     def instruction_name = :class
 
     def to_h
-      super.merge(name:, body: body.map(&:to_h))
+      result = super.merge(name:, body: body.map(&:to_h))
+      result[:superclass] = @superclass if @superclass
+      result
     end
   end
 

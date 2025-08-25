@@ -360,6 +360,25 @@ module SharedBackendExamples
         END
       end
 
+      it 'evaluates examples/inheritance.rb' do
+        result = execute_file(File.expand_path('../../examples/inheritance.rb', __dir__))
+        expect(result).must_equal(<<~END)
+          Generic Animal makes a sound
+          Generic Animal moves around
+
+          Dog name: Buddy
+          Dog breed: Golden Retriever
+          Buddy barks: Woof!
+          Buddy moves around
+          Buddy fetches the ball
+
+          Cat name: Whiskers
+          Whiskers meows: Meow!
+          Whiskers moves around
+          Whiskers climbs a tree
+        END
+      end
+
       it 'evaluates examples/type_annotations.rb' do
         result = execute_file(File.expand_path('../../examples/type_annotations.rb', __dir__))
         expect(result).must_equal(<<~END)
@@ -422,6 +441,239 @@ module SharedBackendExamples
           a + " | " + b
         CODE
         expect(execute(code)).must_equal('data processed | nothing to process')
+      end
+
+      it 'evaluates basic inheritance' do
+        code = <<~CODE
+          class Animal
+            def speak
+              "Some animal sound"
+            end
+          end
+
+          class Dog < Animal
+            def bark
+              "Woof!"
+            end
+          end
+
+          dog = Dog.new
+          dog.speak + " and " + dog.bark
+        CODE
+        expect(execute(code)).must_equal('Some animal sound and Woof!')
+      end
+
+      it 'evaluates method overriding' do
+        code = <<~CODE
+          class Animal
+            def speak
+              "Some animal sound"
+            end
+
+            def move
+              "Animal moves"
+            end
+          end
+
+          class Dog < Animal
+            def speak
+              "Woof!"
+            end
+          end
+
+          animal = Animal.new
+          dog = Dog.new
+          animal.speak + " | " + animal.move + " | " + dog.speak + " | " + dog.move
+        CODE
+        expect(execute(code)).must_equal('Some animal sound | Animal moves | Woof! | Animal moves')
+      end
+
+      it 'evaluates inherited initialize methods' do
+        code = <<~CODE
+          class Animal
+            def initialize(name)
+              @name = name
+            end
+
+            def name
+              @name
+            end
+          end
+
+          class Dog < Animal
+            def bark
+              @name + " says woof!"
+            end
+          end
+
+          dog = Dog.new("Buddy")
+          dog.name + " and " + dog.bark
+        CODE
+        expect(execute(code)).must_equal('Buddy and Buddy says woof!')
+      end
+
+      it 'evaluates overridden initialize methods' do
+        code = <<~CODE
+          class Animal
+            def initialize(name)
+              @name = name
+            end
+
+            def name
+              @name
+            end
+          end
+
+          class Dog < Animal
+            def initialize(name, breed)
+              @name = name
+              @breed = breed
+            end
+
+            def info
+              @name + " is a " + @breed
+            end
+          end
+
+          dog = Dog.new("Buddy", "Golden Retriever")
+          dog.name + " | " + dog.info
+        CODE
+        expect(execute(code)).must_equal('Buddy | Buddy is a Golden Retriever')
+      end
+
+      it 'evaluates multi-level inheritance' do
+        code = <<~CODE
+          class A
+            def initialize(a)
+              @a = a
+            end
+
+            def get_a
+              @a
+            end
+
+            def method_a
+              "A"
+            end
+          end
+
+          class B < A
+            def initialize(a, b)
+              @a = a
+              @b = b
+            end
+
+            def get_b
+              @b
+            end
+
+            def method_a
+              "B overrides A"
+            end
+
+            def method_b
+              "B"
+            end
+          end
+
+          class C < B
+            def initialize(a, b, c)
+              @a = a
+              @b = b
+              @c = c
+            end
+
+            def get_c
+              @c
+            end
+
+            def method_c
+              "C"
+            end
+          end
+
+          c = C.new("value_a", "value_b", "value_c")
+          c.get_a + " | " + c.get_b + " | " + c.get_c + " | " + c.method_a + " | " + c.method_b + " | " + c.method_c
+        CODE
+        expect(execute(code)).must_equal('value_a | value_b | value_c | B overrides A | B | C')
+      end
+
+      it 'evaluates method calls on inherited methods without overriding' do
+        code = <<~CODE
+          class Parent
+            def parent_method
+              "from parent"
+            end
+          end
+
+          class Child < Parent
+            def child_method
+              "from child"
+            end
+          end
+
+          child = Child.new
+          child.parent_method + " and " + child.child_method
+        CODE
+        expect(execute(code)).must_equal('from parent and from child')
+      end
+
+      it 'evaluates complex inheritance with mixed instance variables' do
+        code = <<~CODE
+          class Vehicle
+            def initialize(wheels)
+              @wheels = wheels
+            end
+
+            def wheels
+              @wheels
+            end
+
+            def description
+              "Vehicle with " + @wheels.to_s + " wheels"
+            end
+          end
+
+          class Car < Vehicle
+            def initialize(wheels, doors)
+              @wheels = wheels
+              @doors = doors
+            end
+
+            def doors
+              @doors
+            end
+
+            def description
+              "Car with " + @wheels.to_s + " wheels and " + @doors.to_s + " doors"
+            end
+          end
+
+          class SportsCar < Car
+            def initialize(wheels, doors, top_speed)
+              @wheels = wheels
+              @doors = doors
+              @top_speed = top_speed
+            end
+
+            def top_speed
+              @top_speed
+            end
+
+            def description
+              "Sports car: " + @wheels.to_s + " wheels, " + @doors.to_s + " doors, " + @top_speed.to_s + " mph"
+            end
+          end
+
+          vehicle = Vehicle.new(2)
+          car = Car.new(4, 4)
+          sports_car = SportsCar.new(4, 2, 200)
+
+          vehicle.description + " | " + car.description + " | " + sports_car.description
+        CODE
+        expect(execute(code)).must_equal(
+          'Vehicle with 2 wheels | Car with 4 wheels and 4 doors | Sports car: 4 wheels, 2 doors, 200 mph',
+        )
       end
     end
   end
