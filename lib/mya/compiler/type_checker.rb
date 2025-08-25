@@ -211,14 +211,15 @@ class Compiler
     end
 
     class ClassType < Type
-      def initialize(name, native: false)
+      def initialize(name, native: false, superclass: nil)
         @name = name
         @methods = {}
         @instance_variables = {}
         @native = native
+        @superclass = superclass
       end
 
-      attr_reader :name
+      attr_reader :name, :superclass
 
       def native? = @native
 
@@ -229,12 +230,13 @@ class Compiler
       def get_method_type(method_name)
         return @methods[method_name] if @methods[method_name]
 
+        return @superclass.get_method_type(method_name) if @superclass
+
         method_type = get_builtin_method_type(method_name, BUILTIN_METHODS[name.to_sym])
         return method_type if method_type
 
-        # Fall back to Object methods
-        # FIXME: implement inheritance
-        get_builtin_method_type(method_name, BUILTIN_METHODS[:Object])
+        # Fall back to Object methods only if we don't have a superclass
+        get_builtin_method_type(method_name, BUILTIN_METHODS[:Object]) unless @superclass
       end
 
       def define_method_type(name, method_type)
@@ -242,11 +244,15 @@ class Compiler
       end
 
       def each_instance_variable(&block)
+        return enum_for(:each_instance_variable) unless block_given?
+
         @instance_variables.each(&block)
+        @superclass&.each_instance_variable(&block)
       end
 
       def get_instance_variable(name)
-        @instance_variables[name]
+        return @instance_variables[name] if @instance_variables[name]
+        @superclass&.get_instance_variable(name)
       end
 
       def define_instance_variable(name, variable_type)
@@ -456,11 +462,32 @@ class Compiler
     end
 
     def analyze_class(instruction)
-      class_type = ClassType.new(instruction.name.to_s)
+      superclass =
+        if instruction.superclass
+          @classes[instruction.superclass.to_sym] || raise("Undefined class #{instruction.superclass}")
+        elsif instruction.name.to_s != 'Object'
+          ObjectClass
+        else
+          nil
+        end
+
+      class_type = ClassType.new(instruction.name.to_s, superclass:)
 
       @classes[instruction.name.to_sym] = class_type
 
-      new_method_type = MethodType.new(name: :new, self_type: class_type, param_types: [], return_type: class_type)
+      # Check if superclass has an initialize method to inherit its signature for new
+      inherited_initialize = superclass&.get_method_type(:initialize)
+      if inherited_initialize
+        new_method_type =
+          MethodType.new(
+            name: :new,
+            self_type: class_type,
+            param_types: inherited_initialize.param_types,
+            return_type: class_type,
+          )
+      else
+        new_method_type = MethodType.new(name: :new, self_type: class_type, param_types: [], return_type: class_type)
+      end
       class_type.define_method_type(:new, new_method_type)
 
       class_scope = Scope.new(self_type: class_type, method_params: [], type_checker: self)
@@ -499,24 +526,25 @@ class Compiler
       inferred_return_type = analyze_array_of_instructions(instruction.body)
       @scope_stack.pop
 
-      return_type = if instruction.return_type_annotation
-        annotated_return_type = resolve_type_from_name(instruction.return_type_annotation)
-        # Add constraint to ensure the inferred type matches the annotation
-        add_constraint(
-          Constraint.new(
-            annotated_return_type,
-            inferred_return_type,
-            context: :method_return_type,
-            context_data: {
-              method_name: instruction.name,
-              line: instruction.line,
-            },
-          ),
-        )
-        annotated_return_type
-      else
-        inferred_return_type
-      end
+      return_type =
+        if instruction.return_type_annotation
+          annotated_return_type = resolve_type_from_name(instruction.return_type_annotation)
+          # Add constraint to ensure the inferred type matches the annotation
+          add_constraint(
+            Constraint.new(
+              annotated_return_type,
+              inferred_return_type,
+              context: :method_return_type,
+              context_data: {
+                method_name: instruction.name,
+                line: instruction.line,
+              },
+            ),
+          )
+          annotated_return_type
+        else
+          inferred_return_type
+        end
 
       method_type = MethodType.new(name: instruction.name, self_type: scope.self_type, param_types:, return_type:)
       scope.self_type.define_method_type(instruction.name, method_type)

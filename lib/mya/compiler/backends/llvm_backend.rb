@@ -10,11 +10,17 @@ class Compiler
   module Backends
     class LLVMBackend
       class LLVMClass
-        attr_reader :struct, :ivar_map
+        attr_reader :struct, :ivar_map, :superclass
 
-        def initialize(struct, ivar_map)
+        def initialize(struct, ivar_map, superclass: nil)
           @struct = struct
           @ivar_map = ivar_map
+          @superclass = superclass
+        end
+
+        def find_ivar_index(ivar_name)
+          return @ivar_map[ivar_name] if @ivar_map.key?(ivar_name)
+          @superclass&.find_ivar_index(ivar_name)
         end
       end
 
@@ -100,10 +106,30 @@ class Compiler
 
       def build_class(instruction, function, builder)
         name = instruction.name
+
+        superclass_llvm = nil
+        if instruction.superclass
+          superclass_llvm = @classes[instruction.superclass.to_sym]
+          raise "Superclass #{instruction.superclass} not found" unless superclass_llvm
+        end
+
         ivar_map = {}
         attr_types = []
-        instruction.type!.each_instance_variable.with_index do |(ivar_name, ivar_type), index|
-          ivar_map[ivar_name] = index
+
+        # First, add superclass instance variables if any
+        if superclass_llvm
+          superclass_llvm.ivar_map.each do |ivar_name, index|
+            ivar_map[ivar_name] = attr_types.size
+            attr_types << superclass_llvm.struct.element_types[index]
+          end
+        end
+
+        # Then add this class's own instance variables
+        instruction.type!.each_instance_variable.with_index do |(ivar_name, ivar_type), _|
+          # Skip if already inherited from superclass
+          next if ivar_map.key?(ivar_name)
+
+          ivar_map[ivar_name] = attr_types.size
           attr_types << llvm_type(ivar_type)
         end
 
@@ -111,8 +137,15 @@ class Compiler
         attr_types << LLVM::Int8 if attr_types.empty?
 
         struct = LLVM.Struct(*attr_types, name.to_s)
-        llvm_class = @classes[name.to_sym] = LLVMClass.new(struct, ivar_map)
-        @methods[name.to_sym] = { new: method(:build_call_new) }
+        llvm_class = @classes[name.to_sym] = LLVMClass.new(struct, ivar_map, superclass: superclass_llvm)
+
+        @methods[name.to_sym] = if superclass_llvm
+          @methods[instruction.superclass.to_sym].dup
+        else
+          {}
+        end
+        @methods[name.to_sym][:new] = method(:build_call_new)
+
         @scope_stack << { function:, vars: {}, self_obj: llvm_class }
         build_instructions(function, builder, instruction.body)
         @scope_stack.pop
@@ -241,10 +274,12 @@ class Compiler
 
       def build_push_ivar(instruction, _function, builder)
         ivar_name = instruction.name
-        ivar_map = scope.fetch(:llvm_class).ivar_map
-        field_index = ivar_map.fetch(ivar_name) { raise "Instance variable #{ivar_name} not found" }
+        llvm_class = scope.fetch(:llvm_class)
+        field_index = llvm_class.find_ivar_index(ivar_name)
+        raise "Instance variable #{ivar_name} not found" unless field_index
+
         self_ptr = scope.fetch(:function).params.first
-        struct_type = scope.fetch(:llvm_class).struct
+        struct_type = llvm_class.struct
         field_ptr = builder.struct_gep2(struct_type, self_ptr, field_index, "ivar_#{ivar_name}")
         expected_type = llvm_type(instruction.type!)
         value = builder.load2(expected_type, field_ptr, "load_#{ivar_name}")
@@ -253,11 +288,13 @@ class Compiler
 
       def build_set_ivar(instruction, _function, builder)
         ivar_name = instruction.name
-        ivar_map = scope.fetch(:llvm_class).ivar_map
-        field_index = ivar_map.fetch(ivar_name) { raise "Instance variable #{ivar_name} not found" }
+        llvm_class = scope.fetch(:llvm_class)
+        field_index = llvm_class.find_ivar_index(ivar_name)
+        raise "Instance variable #{ivar_name} not found" unless field_index
+
         value = @stack.last
         self_ptr = scope.fetch(:function).params.first
-        struct_type = scope.fetch(:llvm_class).struct
+        struct_type = llvm_class.struct
         field_ptr = builder.struct_gep2(struct_type, self_ptr, field_index, "ivar_#{ivar_name}")
         builder.store(value, field_ptr)
       end
