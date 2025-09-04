@@ -19,7 +19,7 @@ GEM
     prettier_print (1.2.1)
     prism (1.4.0)
     rake (13.3.0)
-    ruby-llvm (18.1.8)
+    ruby-llvm (20.1.7)
       ffi (~> 1.13)
       rake (>= 12, < 14)
     ruby-progressbar (1.13.0)
@@ -38,7 +38,7 @@ DEPENDENCIES
   minitest-reporters
   prism
   rake
-  ruby-llvm
+  ruby-llvm (~> 20)
   syntax_tree
 
 BUNDLED WITH

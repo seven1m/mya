@@ -1,13 +1,13 @@
-source "https://rubygems.org"
+source 'https://rubygems.org'
 
-gem "minitest"
-gem "minitest-fail-fast"
-gem "minitest-focus"
-gem "minitest-reporters"
-gem "prism"
-gem "rake"
-gem "ruby-llvm"
+gem 'minitest'
+gem 'minitest-fail-fast'
+gem 'minitest-focus'
+gem 'minitest-reporters'
+gem 'prism'
+gem 'rake'
+gem 'ruby-llvm', '~> 20'
 
 group :development do
-  gem "syntax_tree"
+  gem 'syntax_tree'
 end

@@ -32,7 +32,7 @@ class Compiler
         end
 
         def load_size
-          @builder.load2(LLVM::UInt64, field(1))
+          @builder.load2(LLVM::Int64, field(1))
         end
 
         def store_ref_count(count)
@@ -44,7 +44,7 @@ class Compiler
         end
 
         def self.type
-          @type ||= LLVM.Struct(LLVM::Type.ptr, LLVM::UInt64, LLVM::UInt64, 'rc')
+          @type ||= LLVM.Struct(LLVM::Type.ptr, LLVM::Int64, LLVM::Int64, 'rc')
         end
 
         def self.pointer_type

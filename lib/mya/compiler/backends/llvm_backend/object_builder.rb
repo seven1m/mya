@@ -6,7 +6,7 @@ class Compiler
           super(builder:, mod:, ptr: nil)
 
           obj = builder.malloc(struct)
-          obj_ptr = @builder.alloca(LLVM::Type.pointer(LLVM::UInt8))
+          obj_ptr = @builder.alloca(LLVM::Type.pointer(LLVM::Int8))
           @builder.store(obj, obj_ptr)
           store_ptr(obj_ptr)
         end

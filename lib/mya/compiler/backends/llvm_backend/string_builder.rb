@@ -9,13 +9,13 @@ class Compiler
 
           return if ptr
           str = LLVM::ConstantArray.string(string)
-          str_global = @module.globals.add(LLVM::Type.array(LLVM::UInt8, string.bytesize + 1), '')
+          str_global = @module.globals.add(LLVM::Type.array(LLVM::Int8, string.bytesize + 1), '')
           str_global.initializer = str
           str_global.linkage = :private
           str_global.global_constant = true
           str_ptr =
             @builder.gep2(
-              LLVM::Type.array(LLVM::UInt8, string.bytesize + 1),
+              LLVM::Type.array(LLVM::Int8, string.bytesize + 1),
               str_global,
               [LLVM.Int(0), LLVM.Int(0)],
               'str',
@@ -32,7 +32,7 @@ class Compiler
             @module.functions['rc_set_str'] ||
               @module.functions.add(
                 'rc_set_str',
-                [pointer_type, LLVM::Type.pointer(LLVM::UInt8), LLVM::UInt32],
+                [pointer_type, LLVM::Type.pointer(LLVM::Int8), LLVM::Int32],
                 LLVM::Type.void,
               )
         end
