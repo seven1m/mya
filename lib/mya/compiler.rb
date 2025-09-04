@@ -151,9 +151,9 @@ class Compiler
       @instructions << PopInstruction.new unless used
     end
     instruction.if_false = []
-    if node.consequent
+    if node.subsequent
       with_instructions_array(instruction.if_false) do
-        transform(node.consequent, used: true)
+        transform(node.subsequent, used: true)
         @instructions << PopInstruction.new unless used
       end
     elsif used
