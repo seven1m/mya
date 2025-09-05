@@ -3,9 +3,9 @@ GEM
   specs:
     ansi (1.5.0)
     builder (3.3.0)
-    ffi (1.17.0-aarch64-linux-gnu)
-    ffi (1.17.0-arm64-darwin)
-    ffi (1.17.0-x86_64-linux-gnu)
+    ffi (1.17.2-aarch64-linux-gnu)
+    ffi (1.17.2-arm64-darwin)
+    ffi (1.17.2-x86_64-linux-gnu)
     minitest (5.25.5)
     minitest-fail-fast (0.1.0)
       minitest (~> 5)

@@ -1,3 +1,5 @@
+load 'lib/tasks/llvm.rake'
+
 task default: :spec
 
 task build: ['build/lib.ll']

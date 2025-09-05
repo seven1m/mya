@@ -8,6 +8,25 @@ This is also my first foray into using LLVM as a backend, so there's a lot of le
 
 The name "mya" is just a working name... the name will likely change.
 
+## Building & Testing
+
+```sh
+bundle install
+bundle exec rake spec
+```
+
+### Building LLVM
+
+If you don't have LLVM version 20 libraries available on your system, you can build it like this:
+
+```sh
+bundle exec rake llvm:install
+LVM_CONFIG=$(pwd)/vendor/llvm-install/bin/llvm-config bundle install
+export LD_LIBRARY_PATH=$(pwd)/vendor/llvm-install/lib
+bundle exec rake spec
+```
+
+
 ## TODO
 
 ### Basic Ruby Syntax Missing
