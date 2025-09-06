@@ -918,6 +918,7 @@ class Compiler
         :* => MethodType.new(self_type: IntType, param_types: [IntType], return_type: IntType, name: :*),
         :/ => MethodType.new(self_type: IntType, param_types: [IntType], return_type: IntType, name: :/),
         :== => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :==),
+        :!= => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :!=),
         :< => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :<),
         :> => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :>),
         :<= => MethodType.new(self_type: IntType, param_types: [IntType], return_type: BoolType, name: :<=),
@@ -927,10 +928,12 @@ class Compiler
       String: {
         :+ => MethodType.new(self_type: StrType, param_types: [StrType], return_type: StrType, name: :+),
         :== => MethodType.new(self_type: StrType, param_types: [StrType], return_type: BoolType, name: :==),
+        :!= => MethodType.new(self_type: StrType, param_types: [StrType], return_type: BoolType, name: :!=),
         :length => MethodType.new(self_type: StrType, param_types: [], return_type: IntType, name: :length),
       },
       Boolean: {
         :== => MethodType.new(self_type: BoolType, param_types: [BoolType], return_type: BoolType, name: :==),
+        :!= => MethodType.new(self_type: BoolType, param_types: [BoolType], return_type: BoolType, name: :!=),
         :to_s => MethodType.new(self_type: BoolType, param_types: [], return_type: StrType, name: :to_s),
       },
       Object: {

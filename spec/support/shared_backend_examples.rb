@@ -188,6 +188,8 @@ module SharedBackendExamples
         expect(execute('6 / 2')).must_equal 3
         expect(execute('3 == 3')).must_equal true
         expect(execute('3 == 4')).must_equal false
+        expect(execute('3 != 3')).must_equal false
+        expect(execute('3 != 4')).must_equal true
         expect(execute('1 < 2')).must_equal true
         expect(execute('2 < 1')).must_equal false
         expect(execute('2 < 2')).must_equal false

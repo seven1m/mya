@@ -428,6 +428,7 @@ class Compiler
             '*': ->(builder:, args:, **) { builder.mul(*args) },
             '/': ->(builder:, args:, **) { builder.sdiv(*args) },
             '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
+            '!=': ->(builder:, args:, **) { builder.icmp(:ne, *args) },
             '<': ->(builder:, args:, **) { builder.icmp(:slt, *args) },
             '>': ->(builder:, args:, **) { builder.icmp(:sgt, *args) },
             to_s: ->(builder:, args:, **) { builder.call(fn_int_to_string, args.first) },
@@ -437,9 +438,13 @@ class Compiler
             '==': ->(builder:, args:, **) do
               raise NotImplementedError, 'String comparison not yet implemented in LLVM backend'
             end,
+            '!=': ->(builder:, args:, **) do
+              raise NotImplementedError, 'String comparison not yet implemented in LLVM backend'
+            end,
           },
           Boolean: {
             '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
+            '!=': ->(builder:, args:, **) { builder.icmp(:ne, *args) },
             to_s: ->(builder:, args:, **) { builder.call(fn_bool_to_string, args.first) },
           },
           Object: {
