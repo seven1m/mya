@@ -1340,6 +1340,18 @@ describe Compiler do
                            ]
   end
 
+  it 'raises error for Array parameter type annotation mismatch' do
+    code = <<~CODE
+      def process_numbers(nums) # nums:Array[Integer]
+        nums.first
+      end
+
+      process_numbers(['hello', 'world'])
+    CODE
+    e = expect { compile(code) }.must_raise Compiler::TypeChecker::TypeClash
+    expect(e.message).must_equal 'Object#process_numbers argument 1 has type Array[Integer], but you passed Array[String]'
+  end
+
   it 'raises error for instance variable type annotation mismatch' do
     code = <<~CODE
       class Person

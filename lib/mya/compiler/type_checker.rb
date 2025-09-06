@@ -59,7 +59,7 @@ class Compiler
           # Allow Option types to be used as boolean conditions
           return false
         elsif target_resolved.class != source_resolved.class ||
-              (target_resolved.respond_to?(:name) && target_resolved.name != source_resolved.name)
+              target_resolved != source_resolved
           case @context
           when :if_condition
             line_info = @context_data[:line] ? " (line #{@context_data[:line]})" : ''

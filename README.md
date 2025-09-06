@@ -49,7 +49,7 @@ bundle exec rake spec
 - **Module system**: `module` and `include`/`extend`
 
 ### Type System & Language Features
-- **Missing Array type annotations**: While the type system supports `Array[Type]` internally, the syntax for array type annotations in comments may not be fully implemented
-- **No generic type syntax documentation**: The supported generic type syntax (e.g., `Option[String]`) needs better documentation and examples
+- **No generic type syntax documentation**: The supported generic type syntax (e.g., `Option[String]`, `Array[Integer]`) needs better documentation and examples
+- **Nested generic types**: Nested generic types like `Array[Array[Integer]]` are not yet supported in type annotations
 - **Type annotation error messages**: Error messages for type annotation mismatches could be more descriptive and include context about where the annotation was defined
 - **Nil safety**: While Option types exist, there's no comprehensive nil safety system like other modern typed languages
