@@ -193,6 +193,15 @@ module SharedBackendExamples
         expect(execute('1 < 2')).must_equal true
         expect(execute('2 < 1')).must_equal false
         expect(execute('2 < 2')).must_equal false
+        expect(execute('1 <= 2')).must_equal true
+        expect(execute('2 <= 1')).must_equal false
+        expect(execute('2 <= 2')).must_equal true
+        expect(execute('2 > 1')).must_equal true
+        expect(execute('1 > 2')).must_equal false
+        expect(execute('2 > 2')).must_equal false
+        expect(execute('2 >= 1')).must_equal true
+        expect(execute('1 >= 2')).must_equal false
+        expect(execute('2 >= 2')).must_equal true
       end
 
       it 'evaluates simple if expressions' do

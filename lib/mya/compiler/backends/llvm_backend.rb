@@ -430,7 +430,9 @@ class Compiler
             '==': ->(builder:, args:, **) { builder.icmp(:eq, *args) },
             '!=': ->(builder:, args:, **) { builder.icmp(:ne, *args) },
             '<': ->(builder:, args:, **) { builder.icmp(:slt, *args) },
+            '<=': ->(builder:, args:, **) { builder.icmp(:sle, *args) },
             '>': ->(builder:, args:, **) { builder.icmp(:sgt, *args) },
+            '>=': ->(builder:, args:, **) { builder.icmp(:sge, *args) },
             to_s: ->(builder:, args:, **) { builder.call(fn_int_to_string, args.first) },
           },
           String: {

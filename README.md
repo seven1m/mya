@@ -36,7 +36,6 @@ bundle exec rake spec
 - **Pattern matching**: `case`/`when` statements
 - **Loop constructs**: `until`, `for` loops (only `while` supported)
 - **Exception handling**: `begin`/`rescue`/`ensure`/`raise`
-- **Comparison operators**: `<=>` (spaceship operator)
 - **Assignment operators**: `+=`, `-=`, `*=`, `/=`, `||=`, `&&=`
 - **Range operators**: `..`, `...` (inclusive/exclusive ranges)
 - **String interpolation**: `"Hello #{name}"` syntax
