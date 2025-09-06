@@ -16,4 +16,4 @@ jobs:
       - name: build docker image
         run: docker build . -t mya
       - name: run lint
-        run: docker run mya bundle exec rake lint
+        run: docker run --entrypoint="" mya bundle exec rake lint
