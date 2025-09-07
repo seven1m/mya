@@ -49,34 +49,34 @@ class Compiler
     def parse
       annotations = {}
       return annotations if @text.empty?
-      
+
       # Parse parameters
       while @pos < @text.length && !peek_return_arrow?
         skip_whitespace
         break if @pos >= @text.length || peek_return_arrow?
-        
+
         # If we can't parse a variable name, we're done with parameters
         break unless can_parse_variable_name?
-        
+
         var_name = parse_variable_name
         skip_whitespace
-        
+
         # If no colon follows, this isn't a type annotation
         break unless peek(':')
-        
+
         expect(':')
         skip_whitespace
         type_spec = parse_type_spec
-        
+
         annotations[var_name.to_sym] = type_spec
-        
+
         skip_whitespace
         if peek(',')
           consume(',')
           skip_whitespace
         end
       end
-      
+
       # Parse return type
       if peek_return_arrow?
         consume('-')
@@ -84,7 +84,7 @@ class Compiler
         skip_whitespace
         annotations[:return_type] = parse_type_spec
       end
-      
+
       annotations
     end
 
@@ -101,21 +101,17 @@ class Compiler
     def parse_variable_name
       start = @pos
       consume('@') if peek('@')
-      
-      unless peek(/[a-zA-Z_]/)
-        raise "Expected variable name at position #{@pos}"
-      end
-      
-      while peek(/[a-zA-Z0-9_]/)
-        @pos += 1
-      end
-      
+
+      raise "Expected variable name at position #{@pos}" unless peek(/[a-zA-Z_]/)
+
+      @pos += 1 while peek(/[a-zA-Z0-9_]/)
+
       @text[start...@pos]
     end
 
     def parse_type_spec
       type_name = parse_identifier
-      
+
       if peek('[')
         consume('[')
         skip_whitespace
@@ -130,21 +126,17 @@ class Compiler
 
     def parse_identifier
       start = @pos
-      
-      unless peek(/[a-zA-Z]/)
-        raise "Expected identifier at position #{@pos}"
-      end
-      
-      while peek(/[a-zA-Z0-9_]/)
-        @pos += 1
-      end
-      
+
+      raise "Expected identifier at position #{@pos}" unless peek(/[a-zA-Z]/)
+
+      @pos += 1 while peek(/[a-zA-Z0-9_]/)
+
       @text[start...@pos]
     end
 
     def peek(pattern = nil)
       return false if @pos >= @text.length
-      
+
       if pattern.is_a?(Regexp)
         @text[@pos] =~ pattern
       elsif pattern.is_a?(String)
@@ -175,9 +167,7 @@ class Compiler
     end
 
     def skip_whitespace
-      while peek(/\s/)
-        @pos += 1
-      end
+      @pos += 1 while peek(/\s/)
     end
   end
 
