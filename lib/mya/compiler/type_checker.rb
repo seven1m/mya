@@ -299,6 +299,8 @@ class Compiler
 
       def name = :Array
 
+      def native? = false
+
       def get_method_type(method_name)
         get_builtin_method_type(method_name, BUILTIN_METHODS[:Array])
       end
@@ -321,6 +323,8 @@ class Compiler
       def to_s = "Option[#{inner_type.resolve!}]"
 
       def name = :Option
+
+      def native? = false
 
       def get_method_type(method_name)
         get_builtin_method_type(method_name, BUILTIN_METHODS[:Option])

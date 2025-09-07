@@ -1340,6 +1340,34 @@ describe Compiler do
                            ]
   end
 
+  it 'supports nested generic type annotations' do
+    code = <<~CODE
+      def test(matrix) # matrix:Array[Array[String]]
+        matrix.first.first
+      end
+
+      test([['hello', 'world'], ['foo', 'bar']])
+    CODE
+    expect(compile(code)).must_equal_with_diff [
+      { type: 'Object#test(Array[Array[String]]) => String', instruction: :def, name: :test, params: [:matrix], body: [
+        { type: 'Array[Array[String]]', instruction: :push_arg, index: 0 },
+        { type: 'Array[Array[String]]', instruction: :set_var, name: :matrix },
+        { type: 'Array[Array[String]]', instruction: :push_var, name: :matrix },
+        { type: 'Array[String]', instruction: :call, name: :first, arg_count: 0, method_type: 'Array[Array[String]]#first() => Array[String]' },
+        { type: 'String', instruction: :call, name: :first, arg_count: 0, method_type: 'Array[String]#first() => String' }
+      ]},
+      { type: 'Object', instruction: :push_self },
+      { type: 'String', instruction: :push_str, value: 'hello' },
+      { type: 'String', instruction: :push_str, value: 'world' },
+      { type: 'Array[String]', instruction: :push_array, size: 2 },
+      { type: 'String', instruction: :push_str, value: 'foo' },
+      { type: 'String', instruction: :push_str, value: 'bar' },
+      { type: 'Array[String]', instruction: :push_array, size: 2 },
+      { type: 'Array[Array[String]]', instruction: :push_array, size: 2 },
+      { type: 'String', instruction: :call, name: :test, arg_count: 1, method_type: 'Object#test(Array[Array[String]]) => String' }
+    ]
+  end
+
   it 'raises error for Array parameter type annotation mismatch' do
     code = <<~CODE
       def process_numbers(nums) # nums:Array[Integer]

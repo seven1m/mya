@@ -36,23 +36,148 @@ class Compiler
   end
 
   def parse_type_annotations(text)
-    annotations = {}
-    annotations[:return_type] = parse_type_spec($1) if text =~ /->\s*([A-Z]\w*(?:\[[A-Z]\w*\])?)/
-
-    # Match patterns like "a:Integer", "b:String", "c:Option[String]", "@name:String"
-    text.scan(/(@?\w+)\s*:\s*([A-Z]\w*(?:\[[A-Z]\w*\])?)/) do |var_name, type_spec|
-      annotations[var_name.to_sym] = parse_type_spec(type_spec)
-    end
-
-    annotations
+    return {} if text.nil? || text.strip.empty?
+    TypeAnnotationParser.new(text).parse
   end
 
-  def parse_type_spec(type_spec)
-    # Handle generic types like Option[String]
-    if type_spec =~ /^(\w+)\[(\w+)\]$/
-      { generic: $1.to_sym, inner: $2.to_sym }
-    else
-      type_spec.to_sym
+  class TypeAnnotationParser
+    def initialize(text)
+      @text = text.strip
+      @pos = 0
+    end
+
+    def parse
+      annotations = {}
+      return annotations if @text.empty?
+      
+      # Parse parameters
+      while @pos < @text.length && !peek_return_arrow?
+        skip_whitespace
+        break if @pos >= @text.length || peek_return_arrow?
+        
+        # If we can't parse a variable name, we're done with parameters
+        break unless can_parse_variable_name?
+        
+        var_name = parse_variable_name
+        skip_whitespace
+        
+        # If no colon follows, this isn't a type annotation
+        break unless peek(':')
+        
+        expect(':')
+        skip_whitespace
+        type_spec = parse_type_spec
+        
+        annotations[var_name.to_sym] = type_spec
+        
+        skip_whitespace
+        if peek(',')
+          consume(',')
+          skip_whitespace
+        end
+      end
+      
+      # Parse return type
+      if peek_return_arrow?
+        consume('-')
+        consume('>')
+        skip_whitespace
+        annotations[:return_type] = parse_type_spec
+      end
+      
+      annotations
+    end
+
+    private
+
+    def can_parse_variable_name?
+      saved_pos = @pos
+      consume('@') if peek('@')
+      result = peek(/[a-zA-Z_]/)
+      @pos = saved_pos
+      result
+    end
+
+    def parse_variable_name
+      start = @pos
+      consume('@') if peek('@')
+      
+      unless peek(/[a-zA-Z_]/)
+        raise "Expected variable name at position #{@pos}"
+      end
+      
+      while peek(/[a-zA-Z0-9_]/)
+        @pos += 1
+      end
+      
+      @text[start...@pos]
+    end
+
+    def parse_type_spec
+      type_name = parse_identifier
+      
+      if peek('[')
+        consume('[')
+        skip_whitespace
+        inner_type = parse_type_spec
+        skip_whitespace
+        expect(']')
+        { generic: type_name.to_sym, inner: inner_type }
+      else
+        type_name.to_sym
+      end
+    end
+
+    def parse_identifier
+      start = @pos
+      
+      unless peek(/[a-zA-Z]/)
+        raise "Expected identifier at position #{@pos}"
+      end
+      
+      while peek(/[a-zA-Z0-9_]/)
+        @pos += 1
+      end
+      
+      @text[start...@pos]
+    end
+
+    def peek(pattern = nil)
+      return false if @pos >= @text.length
+      
+      if pattern.is_a?(Regexp)
+        @text[@pos] =~ pattern
+      elsif pattern.is_a?(String)
+        @text[@pos...@pos + pattern.length] == pattern
+      else
+        @text[@pos]
+      end
+    end
+
+    def peek_return_arrow?
+      peek('-') && @pos + 1 < @text.length && @text[@pos + 1] == '>'
+    end
+
+    def consume(expected)
+      if peek(expected)
+        if expected.is_a?(String)
+          @pos += expected.length
+        else
+          @pos += 1
+        end
+      else
+        raise "Expected '#{expected}' at position #{@pos}, got '#{@text[@pos]}'"
+      end
+    end
+
+    def expect(expected)
+      consume(expected)
+    end
+
+    def skip_whitespace
+      while peek(/\s/)
+        @pos += 1
+      end
     end
   end
 
