@@ -30,11 +30,13 @@ end
 desc 'Format code'
 task :format do
   sh 'stree write **/*.rb'
+  sh 'clang-format -i src/lib.c'
 end
 
 desc 'Run lint (syntax-check only for now)'
 task :lint do
   sh 'stree check **/*.rb'
+  sh 'clang-format --dry-run --Werror src/lib.c'
 end
 
 desc 'Run lint in a Docker container'
