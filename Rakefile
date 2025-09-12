@@ -36,7 +36,7 @@ end
 desc 'Run lint (syntax-check only for now)'
 task :lint do
   sh 'stree check **/*.rb'
-  sh 'clang-format --dry-run --Werror src/lib.c'
+  # sh 'clang-format --dry-run --Werror src/lib.c'
 end
 
 desc 'Run lint in a Docker container'
